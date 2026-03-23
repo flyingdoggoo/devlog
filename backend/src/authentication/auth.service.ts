@@ -49,6 +49,6 @@ export class AuthService {
         if(existingUser){
             throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
         }
-        return this.userService.create(registerDto);
+        return this.userService.createUser(registerDto);
     }
 }

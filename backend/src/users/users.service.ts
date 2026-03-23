@@ -27,12 +27,12 @@ export class UsersService {
   async findByUsername(username: string) {
     const credential = await this.prisma.credential.findUnique({
       where: {
-        username
+        username,
       }
     });
     return credential;
   }
-  async create(createUserDto: CreateUserDto) {
+  async createUser(createUserDto: CreateUserDto) {
     const { email, password, username } = createUserDto;
     const user = await this.prisma.user.create({
       data: {
@@ -50,22 +50,40 @@ export class UsersService {
   }
 
   async getAllUsers() {
-    return this.prisma.user.findMany();
+    return this.prisma.user.findMany({
+      where: {
+        active: true
+      }
+    });
   }
 
-  async findAll() {
-    return this.prisma.user.findMany();
+  async findOneUserById(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId, active: true },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async updateUserById(userId: string, updateUserDto: UpdateUserDto) {
+    const { name, email } = updateUserDto;
+
+    return this.prisma.user.update({
+      where: { id: userId, active: true },
+      data: {
+        name: name,
+        credentials: email ? {
+          updateMany: {
+            where: { userId },
+            data: { email }
+          }
+        } : undefined
+      },
+    });
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
-  }
-
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async removeUserById(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId, active: true },
+      data: { active: false },
+    });
   }
 }
