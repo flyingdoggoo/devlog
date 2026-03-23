@@ -23,7 +23,7 @@ model Account {
 
 model Credential {
   id           String   @id @default(uuid())
-  userId       String
+  userId       String   
   email        String   @unique
   username     String   @unique
   passwordHash String
@@ -41,20 +41,20 @@ model Session {
 }
 
 model User {
-  id          String       @id @default(uuid())
-  name        String?
-  createdAt   DateTime     @default(now())
-  active      Boolean      @default(true)
-  accounts    Account[]
-  credentials Credential[]
-  sessions    Session[]
-  posts       Post[]
-  comments    Comment[]
-  likes       Like[]
-  followers   Follow[]     @relation("Follower")
-  following   Follow[]     @relation("Following")
+  id                    String         @id @default(uuid())
+  name                  String?
+  createdAt             DateTime       @default(now())
+  active                Boolean        @default(true)
+  accounts              Account[]
+  credentials           Credential[]
+  sessions              Session[]
+  posts                 Post[]
+  comments              Comment[]
+  likes                 Like[]
+  followers             Follow[]       @relation("Follower")
+  following             Follow[]       @relation("Following")
   notificationsReceived Notification[] @relation("NotificationReceiver")
-  notificationsActedOn Notification[] @relation("NotificationActor")
+  notificationsActedOn  Notification[] @relation("NotificationActor")
 }
 
 enum PostStatus {
@@ -64,30 +64,31 @@ enum PostStatus {
 }
 
 model Post {
-  id            String     @id @default(uuid())
+  id            String         @id @default(uuid())
   authorId      String
   title         String
-  slug          String    @unique
-  content       String
-  excerpt        String
-  coverImageUrl String
-  viewCount     Int        @default(0)
-  status        PostStatus @default(DRAFT)
-  publishedAt  DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  author        User       @relation(fields: [authorId], references: [id])
-  tags         PostTag[]
-  comments     Comment[]
-  likes        Like[]
+  slug          String         @unique
+  content       String         @default("")
+  excerpt       String         @default("")
+  coverImageUrl String         @default("")
+  viewCount     Int            @default(0)
+  status        PostStatus     @default(DRAFT)
+  publishedAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  author        User           @relation(fields: [authorId], references: [id])
+  tags          PostTag[]
+  comments      Comment[]
+  likes         Like[]
   notifications Notification[]
+
   @@index([authorId, createdAt])
   @@index([status, createdAt])
 }
 
 model Tag {
-  id   String @id @default(uuid())
-  name  String @unique
+  id    String    @id @default(uuid())
+  name  String    @unique
   posts PostTag[]
 }
 
@@ -102,17 +103,17 @@ model PostTag {
 }
 
 model Comment {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   postId    String
   authorId  String
   content   String
-  parentId String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
   replies   Comment[] @relation("CommentReplies")
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id])
+  post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
 
   @@index([postId, createdAt])
   @@index([authorId])
@@ -132,12 +133,12 @@ model Like {
 }
 
 model Follow {
-  id         String   @id @default(uuid())
-  followerId String
+  id          String   @id @default(uuid())
+  followerId  String
   followingId String
-  createdAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 
-  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
   following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
@@ -152,13 +153,13 @@ enum NotificationType {
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String                    
-  actorId   String                    
-  type      NotificationType                    
+  id        String           @id @default(uuid())
+  userId    String
+  actorId   String
+  type      NotificationType
   postId    String?
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
 
   user  User  @relation("NotificationReceiver", fields: [userId], references: [id])
   actor User  @relation("NotificationActor", fields: [actorId], references: [id])
