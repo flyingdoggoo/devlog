@@ -48,4 +48,121 @@ model User {
   accounts    Account[]
   credentials Credential[]
   sessions    Session[]
+  posts       Post[]
+  comments    Comment[]
+  likes       Like[]
+  followers   Follow[]     @relation("Follower")
+  following   Follow[]     @relation("Following")
+  notificationsReceived Notification[] @relation("NotificationReceiver")
+  notificationsActedOn Notification[] @relation("NotificationActor")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Post {
+  id            String     @id @default(uuid())
+  authorId      String
+  title         String
+  slug          String    @unique
+  content       String
+  excerpt        String
+  coverImageUrl String
+  viewCount     Int        @default(0)
+  status        PostStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  author        User       @relation(fields: [authorId], references: [id])
+  tags         PostTag[]
+  comments     Comment[]
+  likes        Like[]
+  notifications Notification[]
+  @@index([authorId, createdAt])
+  @@index([status, createdAt])
+}
+
+model Tag {
+  id   String @id @default(uuid())
+  name  String @unique
+  posts PostTag[]
+}
+
+model PostTag {
+  postId String
+  tagId  String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  parentId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followerId String
+  followingId String
+  createdAt  DateTime @default(now())
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  NEW_COMMENT
+  NEW_LIKE
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String                    
+  actorId   String                    
+  type      NotificationType                    
+  postId    String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user  User  @relation("NotificationReceiver", fields: [userId], references: [id])
+  actor User  @relation("NotificationActor", fields: [actorId], references: [id])
+  post  Post? @relation(fields: [postId], references: [id])
+
+  @@index([userId, read, createdAt])
 }
