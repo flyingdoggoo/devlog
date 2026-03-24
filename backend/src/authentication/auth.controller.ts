@@ -1,11 +1,13 @@
 import { AuthService } from './auth.service';
-import { Controller, Post, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Res, Get } from '@nestjs/common';
 import { RegisterDto, LoginDto } from '@authentication/dto';
 import { LocalAuthGuard } from '@authentication/guard/local.guard';
-import type { Request, Response } from 'express';
 import { CredentialAfterGuard } from './interface/credential-after-guard.interface';
 import { RequestWithCredential } from './interface/request-with-credential.interface';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
+import { GoogleAuthGuard } from './guard/google.guard';
+import { RequestWithGoogleUser } from './interface/request-with-google-user-interface';
 @Controller('auth')
 @ApiTags('auth')
 export class AuthController {
@@ -35,6 +37,18 @@ export class AuthController {
         return response.status(200).send();
     }
 
+    @Get('google')
+    @UseGuards(GoogleAuthGuard)
+    async googleLogin() {
+
+    }
+
+    @Get('google/callback')
+    @UseGuards(GoogleAuthGuard)
+    async googleLoginCallback(@Req() req: RequestWithGoogleUser, @Res() response: Response) {
+        const googleUser = req.user;
+        
+    }
     @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
     async register(@Body() registerDto: RegisterDto){
