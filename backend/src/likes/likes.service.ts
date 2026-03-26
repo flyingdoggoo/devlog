@@ -38,13 +38,17 @@ export class LikesService {
     if (!user)
       throw new NotFoundException('User not found');
 
-    const like = await this.prisma.like.upsert({
-      where: { postId_userId: { postId, userId } },
-      create: { postId, userId, active: false },
-      update: { active: false }
+    const like = await this.prisma.like.findUnique({
+      where: { postId_userId: { postId, userId } }
     });
-    
-    return like;
+    if (!like)
+      throw new NotFoundException('Like not found');
+    if(!like.active)
+      throw new ConflictException('Post already unliked');
+    return this.prisma.like.update({
+      where: { postId_userId: { postId, userId } },
+      data: { active: false }
+    });
   }
 
   async findAllUsersWhoLikedPost(postId: string) {
