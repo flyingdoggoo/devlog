@@ -8,6 +8,42 @@ export class UsersService {
 
   constructor(private prisma: PrismaService) { }
 
+  async getMe(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId, active: true },
+      select: {
+        id: true,
+        name: true,
+        credentials: {
+          select: {
+            email: true,
+            username: true
+          }
+        },
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+            posts: true,
+            comments: true
+          }
+        },
+        followers: {
+          select: {
+            id: true,
+          }
+        },
+        following: {
+          select: {
+            id: true,
+          }
+        },
+        comments: true,
+        posts: true
+      }
+    });
+  }
+
   async findByEmail(email: string) {
     const credential = await this.prisma.credential.findUnique({
       where: {

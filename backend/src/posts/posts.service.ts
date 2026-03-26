@@ -13,7 +13,9 @@ const postInclude = {
     }
   },
   author: { select: { id: true, name: true } },
-  _count: { select: { likes: true, comments: true } }
+  _count: { select:
+    { likes: { where: { active: true } },
+    comments: { where: { active: true } } } }
 }
 @Injectable()
 export class PostsService {
