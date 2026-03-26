@@ -29,11 +29,17 @@ export class UsersService {
           }
         },
         followers: {
+          where: {
+            active: true
+          },
           select: {
             id: true,
           }
         },
         following: {
+          where: {
+            active: true
+          },
           select: {
             id: true,
           }

@@ -13,6 +13,10 @@ export class CommentsService {
     if (!post)
       throw new NotFoundException('Post not found');
 
+    const parentComment = await this.prisma.comment.findUnique({
+      where: { id: createCommentDto.parentId, active: true }
+    });
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId, active: true },
       select: { id: true, name: true }
@@ -21,11 +25,11 @@ export class CommentsService {
       throw new NotFoundException('User not found');
 
     if (createCommentDto.parentId) {
-      const parentComment = await this.prisma.comment.findUnique({
-        where: { id: createCommentDto.parentId, active: true }
-      });
       if (!parentComment)
         throw new NotFoundException('Parent comment not found');
+      if (createCommentDto.parentId && parentComment?.postId !== postId) {
+        throw new NotFoundException('Parent comment not found');
+      }
     }
 
     return this.prisma.comment.create({
@@ -70,6 +74,7 @@ export class CommentsService {
     const comment = await this.prisma.comment.findUnique({
       where: {
         id: commentId,
+        authorId: userId,
         active: true,
         author: {
           active: true
@@ -87,7 +92,7 @@ export class CommentsService {
 
   async removeComment(commentId: string, userId: string) {
     return this.prisma.comment.delete({
-      where: { id: commentId },
+      where: { id: commentId, authorId: userId },
     });
   }
 }

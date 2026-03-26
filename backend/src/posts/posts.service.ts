@@ -71,11 +71,11 @@ export class PostsService {
     }
     return slug;
   }
-  async updatePost(id: string, updatePostDto: UpdatePostDto) {
+  async updatePost(id: string, updatePostDto: UpdatePostDto, authorId: string) {
     const { title, content, tagIds } = updatePostDto;
     const slug = title ? slugify(title, { lower: true }) : undefined;
     return this.prisma.post.update({
-      where: { id },
+      where: { id, authorId },
       data: {
         title,
         content,
@@ -91,8 +91,8 @@ export class PostsService {
     });
   }
 
-  async removePost(id: string) {
-    const post = await this.prisma.post.findUnique({ where: { id } });
+  async removePost(id: string, authorId: string) {
+    const post = await this.prisma.post.findUnique({ where: { id, authorId } });
     if (!post)
       throw new NotFoundException('Post not found');
     return this.prisma.post.update({

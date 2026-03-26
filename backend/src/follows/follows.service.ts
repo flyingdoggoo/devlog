@@ -7,6 +7,12 @@ import { PrismaService } from '@prisma/prisma.service';
 export class FollowsService {
   constructor(private prisma: PrismaService) { }
   async follow(createFollowDto: CreateFollowDto, userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, active: true }
+    });
+    if (!user) {
+      throw new Error('User not found');
+    }
     if (userId === createFollowDto.toUserId) {
       throw new Error('Cannot follow yourself');
     }
@@ -15,7 +21,8 @@ export class FollowsService {
         followerId_followingId: {
           followerId: userId,
           followingId: createFollowDto.toUserId
-        }
+        },
+        active: true
       }
     });
     if (isFollow) {
@@ -38,18 +45,22 @@ export class FollowsService {
         followerId_followingId: {
           followerId: userId,
           followingId: dto.toUserId
-        }
+        },
+        active: true
       }
     });
     if (!isFollow) {
       throw new Error('Not following');
     }
-    return this.prisma.follow.delete({
+    return this.prisma.follow.update({
       where: {
         followerId_followingId: {
           followerId: userId,
           followingId: dto.toUserId
         }
+      },
+      data: {
+        active: false
       }
     });
   }
@@ -57,15 +68,16 @@ export class FollowsService {
   async getAllFollowers(userId: string) {
     return this.prisma.follow.findMany({
       where: {
-        followingId: userId
+        followingId: userId,
+        active: true
       },
       include: {
         follower: {
           select: {
             id: true,
             name: true
-          }
-        }
+          },
+        },
       }
     });
   }
@@ -73,7 +85,8 @@ export class FollowsService {
   async getFollowings(userId: string) {
     return this.prisma.follow.findMany({
       where: {
-        followerId: userId
+        followerId: userId,
+        active: true
       },
       include: {
         following: {

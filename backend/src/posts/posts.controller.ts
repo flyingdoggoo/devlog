@@ -30,14 +30,16 @@ export class PostsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
-  updatePost(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto) {
-    return this.postsService.updatePost(id, updatePostDto);
+  updatePost(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto, @Req() req) {
+    const userId = req.user.userId;
+    return this.postsService.updatePost(id, updatePostDto, userId);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a post by ID' })
   @UseGuards(JwtAuthGuard)
-  remove(@Param('id') id: string) {
-    return this.postsService.removePost(id);
+  remove(@Param('id') id: string, @Req() req) {
+    const userId = req.user.userId;
+    return this.postsService.removePost(id, userId);
   }
 }
