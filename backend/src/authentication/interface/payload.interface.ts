@@ -1,3 +1,3 @@
 export interface Payload {
-    credentialId: string;
+    userId: string;
 }

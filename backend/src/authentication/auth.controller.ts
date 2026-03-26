@@ -2,10 +2,9 @@ import { AuthService } from './auth.service';
 import { Controller, Post, Body, UseGuards, Req, Res, Get } from '@nestjs/common';
 import { RegisterDto, LoginDto } from '@authentication/dto';
 import { LocalAuthGuard } from '@authentication/guard/local.guard';
-import { CredentialAfterGuard } from './interface/credential-after-guard.interface';
 import { RequestWithCredential } from './interface/request-with-credential.interface';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { GoogleAuthGuard } from './guard/google.guard';
 import { RequestWithGoogleUser } from './interface/request-with-google-user-interface';
 @Controller('auth')
@@ -25,30 +24,42 @@ export class AuthController {
         if(!credential){
             return response.status(401).send({ message: 'Invalid credentials' });
         }
-        const newCredential: CredentialAfterGuard = {
-            id: credential.id,
-            email: credential.email,
-            username: credential.username,
-            userId: credential.userId,
-            createdAt: credential.createdAt
-        };
-        const cookie = await this.authService.login(newCredential);
-        response.setHeader('Set-Cookie', cookie);
+        const cookies = await this.authService.loginByUserId(credential.userId);
+        response.setHeader('Set-Cookie', cookies);
         return response.status(200).send();
     }
 
     @Get('google')
     @UseGuards(GoogleAuthGuard)
     async googleLogin() {
-
+        //Không cần xử lý gì ở đây
+        //GoogleAuthGuard sẽ tự động chuyển hướng người dùng đến trang đăng nhập của Google
     }
 
     @Get('google/callback')
     @UseGuards(GoogleAuthGuard)
     async googleLoginCallback(@Req() req: RequestWithGoogleUser, @Res() response: Response) {
         const googleUser = req.user;
-        
+        const cookies = await this.authService.loginWithGoogle(googleUser);
+        const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+        response.setHeader('Set-Cookie', cookies);
+        return response.redirect(frontendUrl);
     }
+
+    @Post('refresh')
+    async refresh(@Req() request: Request, @Res() response: Response) {
+        const refreshToken = request.cookies?.RefreshToken;
+        const sessionId = request.cookies?.SessionId;
+
+        if (!refreshToken || !sessionId) {
+            return response.status(401).send({ message: 'Refresh token is missing' });
+        }
+
+        const cookies = await this.authService.refreshSession(refreshToken, sessionId);
+        response.setHeader('Set-Cookie', cookies);
+        return response.status(200).send();
+    }
+
     @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
     async register(@Body() registerDto: RegisterDto){
