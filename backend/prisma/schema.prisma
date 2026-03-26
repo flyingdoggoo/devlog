@@ -19,6 +19,9 @@ model Account {
   providerAccountId String
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Credential {
@@ -38,6 +41,8 @@ model Session {
   expires          DateTime
   createdAt        DateTime @default(now())
   user             User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, expires])
 }
 
 model User {
