@@ -3,6 +3,7 @@ import { CreateUserDto } from '@users/dto/create-user.dto';
 import { UpdateUserDto } from '@users/dto/update-user.dto';
 import { PrismaService } from '@prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { PostStatus } from '@prisma/client';
 @Injectable()
 export class UsersService {
 
@@ -22,10 +23,10 @@ export class UsersService {
         },
         _count: {
           select: {
-            followers: true,
-            following: true,
-            posts: true,
-            comments: true
+            followers: { where: { active: true } },
+            following: { where: { active: true } },
+            posts: { where: { status: PostStatus.PUBLISHED } },
+            comments: { where: { active: true } }
           }
         },
         followers: {
@@ -44,8 +45,8 @@ export class UsersService {
             id: true,
           }
         },
-        comments: true,
-        posts: true
+        comments: { where: { active: true } },
+        posts: { where: { status: PostStatus.PUBLISHED } }
       }
     });
   }

@@ -41,6 +41,7 @@ export function LoginForm() {
     const result = await dispatch(login({
       email: formData.email,
       password: formData.password,
+      remember: formData.remember,
     }));
     
     // Check nếu login thành công
@@ -170,7 +171,10 @@ export function LoginForm() {
 
           {/* Social Logins */}
           <div className="grid grid-cols-2 gap-4">
-            <SocialButton provider="github" />
+            <SocialButton 
+              provider="github" 
+              onClick={() => handleSocialLogin('github')} 
+            />
             <SocialButton 
               provider="google" 
               onClick={() => handleSocialLogin('google')} 

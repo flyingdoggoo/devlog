@@ -7,7 +7,7 @@ export interface GoogleUser {
 	email?: string;
 	name: string;
 	accessToken: string;
-	refreshToken: string;
+	refreshToken?: string;
 }
 
 export interface RequestWithGoogleUser extends Request {

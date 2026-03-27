@@ -107,6 +107,12 @@ export class AuthService {
 
         const existingCredential = await this.userService.findByEmail(googleUser.email);
         if (existingCredential) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: existingCredential.userId },
+            });
+            if (!user || !user.active) {
+                throw new HttpException('Account is deactivated', HttpStatus.UNAUTHORIZED);
+            }
             await this.prisma.account.create({
                 data: {
                     userId: existingCredential.userId,
@@ -115,9 +121,6 @@ export class AuthService {
                 },
             });
 
-            const user = await this.prisma.user.findUnique({
-                where: { id: existingCredential.userId },
-            });
             if (user && !user.name && googleUser.name) {
                 await this.prisma.user.update({
                     where: { id: existingCredential.userId },
@@ -128,11 +131,16 @@ export class AuthService {
             return this.issueSessionCookies(existingCredential.userId);
         }
 
-        let username = `user-${randomBytes(4).toString('hex')}`;
-        while (await this.userService.findByUsername(username)) {
+        const MAX_RETRIES = 10;
+        let username: string;
+        let attempts = 0;
+        do {
             username = `user-${randomBytes(4).toString('hex')}`;
-        }
-        const randomPassword = randomBytes(32).toString('hex');
+            attempts++;
+            if (attempts > MAX_RETRIES) {
+                throw new HttpException('Failed to generate unique username', HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } while (await this.userService.findByUsername(username));        const randomPassword = randomBytes(32).toString('hex');
         const passwordHash = await bcrypt.hash(randomPassword, 10);
 
         const createdUser = await this.prisma.user.create({

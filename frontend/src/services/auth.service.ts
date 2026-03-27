@@ -30,6 +30,7 @@ export const authApi = {
 export interface LoginDto {
   email: string;
   password: string;
+  remember: boolean;
 }
 
 export interface RegisterDto {

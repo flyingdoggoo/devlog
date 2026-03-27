@@ -27,8 +27,8 @@ export interface AuthState {
   user: {
     id: string;
     name: string | null;
-    email?: string;
-    username?: string;
+    email: string;
+    username: string;
   } | null;
   loading: boolean;
   error: string | null;

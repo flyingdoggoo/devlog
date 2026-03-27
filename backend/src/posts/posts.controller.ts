@@ -30,6 +30,7 @@ export class PostsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Update a post by ID' })
   updatePost(@Param('id') id: string, @Body() updatePostDto: UpdatePostDto, @Req() req) {
     const userId = req.user.userId;
     return this.postsService.updatePost(id, updatePostDto, userId);

@@ -19,7 +19,6 @@ export const login = createAsyncThunk(
       const user = await authApi.getCurrentUser();
       
       // Bước 4: Update Redux state
-      console.log('Login successful, user:', user);
       dispatch(loginSuccess(user));
       
       return user;
@@ -34,15 +33,9 @@ export const login = createAsyncThunk(
 
 export const loginWithGoogle = createAsyncThunk(
   'auth/loginWithGoogle',
-  async (_, { dispatch }) => {
-    try {
-      dispatch(loginStart());
-      // Google OAuth sẽ redirect, không cần await
-      authApi.loginWithGoogle();
-    } catch (error: any) {
-      const errorMessage = error.message || 'Google login failed';
-      dispatch(loginFailure(errorMessage));
-    }
+  async () => {
+    // Triggers redirect - state will be restored via checkAuth on return
+    authApi.loginWithGoogle();
   }
 );
 
@@ -51,9 +44,10 @@ export const logoutThunk = createAsyncThunk(
   async (_, { dispatch }) => {
     try {
       await authApi.logout();
-      dispatch(logout());
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      dispatch(logout());
     }
   }
 );

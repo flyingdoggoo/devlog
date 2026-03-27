@@ -42,7 +42,7 @@ export class CommentsService {
       where: { id: postId, status: PostStatus.PUBLISHED }
     });
     if (!post) throw new NotFoundException('Post not found');
-    
+
     const allComments = await this.prisma.comment.findMany({
       where: {
         postId,
@@ -69,7 +69,7 @@ export class CommentsService {
 
   async updateComment(commentId: string, userId: string, updateCommentDto: UpdateCommentDto) {
     const { content } = updateCommentDto;
-    const comment = await this.prisma.comment.findUnique({
+    const comment = await this.prisma.comment.findFirst({
       where: {
         id: commentId,
         authorId: userId,
@@ -89,8 +89,19 @@ export class CommentsService {
   }
 
   async removeComment(commentId: string, userId: string) {
-    return this.prisma.comment.delete({
-      where: { id: commentId, authorId: userId },
+    const comment = await this.prisma.comment.findFirst({
+      where: {
+        id: commentId,
+        authorId: userId,
+        active: true,
+      }
+    });
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+    return this.prisma.comment.update({
+      where: { id: commentId },
+      data: { active: false }
     });
   }
 }

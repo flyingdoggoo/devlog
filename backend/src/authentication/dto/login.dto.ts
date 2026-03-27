@@ -18,4 +18,10 @@ export class LoginDto {
     @MinLength(6, { message: 'Password should be at least 6 characters long' })
     @Transform(({ value }) => value.trim())
     password: string;
+
+    @ApiProperty({
+        description: 'Remember me option',
+        example: true,
+    })
+    remember: boolean;
 }

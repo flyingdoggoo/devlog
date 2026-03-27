@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '@services/api';
 
 export function CreatePostPage() {
   const navigate = useNavigate();
@@ -9,6 +10,8 @@ export function CreatePostPage() {
   const [wordCount, setWordCount] = useState(0);
   const [readingTime, setReadingTime] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // Auto-save simulation
@@ -16,12 +19,10 @@ export function CreatePostPage() {
     const value = e.target.value;
     setContent(value);
     
-    // Calculate word count
     const words = value.trim().split(/\s+/).filter(word => word.length > 0);
     setWordCount(words.length);
     setReadingTime(Math.ceil(words.length / 200)); // 200 words per minute
     
-    // Auto-save debounce
     if (isSaving) return;
     setIsSaving(true);
     setTimeout(() => {
@@ -31,10 +32,36 @@ export function CreatePostPage() {
     }, 1000);
   };
 
-  const handlePublish = () => {
-    console.log('Publishing:', { title, content, tags });
-    // TODO: Call API to create post
-    navigate('/');
+  const handlePublish = async () => {
+    const normalizedTitle = title.trim();
+    const normalizedContent = content.trim();
+
+    if (!normalizedTitle || !normalizedContent || isPublishing) {
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      setPublishError(null);
+
+      await apiClient.post('/posts', {
+        title: normalizedTitle,
+        content: normalizedContent,
+      });
+
+      navigate('/');
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      if (Array.isArray(message)) {
+        setPublishError(message.join(', '));
+      } else if (typeof message === 'string') {
+        setPublishError(message);
+      } else {
+        setPublishError('Failed to publish post. Please try again.');
+      }
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleAddTag = () => {
@@ -60,7 +87,7 @@ export function CreatePostPage() {
       <header className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/50 z-50">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
             className="p-2 hover:bg-neutral-100 transition-colors duration-150 rounded-lg group"
           >
             <span className="material-symbols-outlined">arrow_back</span>
@@ -68,20 +95,23 @@ export function CreatePostPage() {
           <div className="h-6 w-[1px] bg-neutral-300/30"></div>
           <span className="text-2xl font-bold font-['Space_Grotesk']">DevLog</span>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-neutral-400 font-mono text-xs hidden md:block">
-            {isSaving ? 'SAVING...' : lastSaved ? `AUTOSAVED AT ${lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'NOT SAVED'}
-          </span>
+          <div className="flex items-center gap-4">
+            {publishError && (
+              <span className="text-red-500 text-xs font-medium">{publishError}</span>
+            )}
+            <span className="text-neutral-400 font-mono text-xs hidden md:block">
+              {isSaving ? 'SAVING...' : lastSaved ? `AUTOSAVED AT ${lastSaved.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'NOT SAVED'}
+            </span>
           <div className="flex items-center gap-2">
             <button className="px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100 transition-colors rounded-lg">
               Preview
             </button>
             <button 
               onClick={handlePublish}
-              disabled={!title.trim() || !content.trim()}
+              disabled={!title.trim() || !content.trim() || isPublishing}
               className="bg-gradient-to-br from-black to-neutral-700 text-white px-5 py-2 rounded-lg text-sm font-semibold tracking-wide shadow-sm active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Publish
+              {isPublishing ? 'Publishing...' : 'Publish'}
             </button>
           </div>
         </div>
@@ -161,12 +191,15 @@ export function CreatePostPage() {
               {tags.map((tag) => (
                 <div 
                   key={tag} 
-                  className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-medium text-neutral-600 border border-transparent hover:border-neutral-300 transition-all cursor-pointer"
-                  onClick={() => handleRemoveTag(tag)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-neutral-100 rounded-lg text-xs font-medium text-neutral-600 border border-transparent hover:border-neutral-300 transition-all"
                 >
                   <span className="material-symbols-outlined text-[16px]">tag</span>
                   <span>{tag}</span>
-                  <span className="material-symbols-outlined text-[14px] hover:text-red-500">close</span>
+                  <button 
+                    onClick={() => handleRemoveTag(tag)}
+                    className="material-symbols-outlined text-[14px] hover:text-red-500 cursor-pointer"
+                    aria-label={`Remove tag ${tag}`}
+                  >close</button>
                 </div>
               ))}
               <button 

@@ -13,38 +13,52 @@ export class FollowsService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: createFollowDto.toUserId, active: true }
+    });
+    if (!targetUser) {
+      throw new NotFoundException('Target user not found');
+    }
     if (userId === createFollowDto.toUserId) {
       throw new ConflictException('Cannot follow yourself');
     }
-    const isFollow = await this.prisma.follow.findUnique({
+    const existingFollow = await this.prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId: userId,
           followingId: createFollowDto.toUserId
-        },
-        active: true
+        }
       }
     });
-    if (isFollow) {
+    if (existingFollow?.active) {
       throw new ConflictException('Already following');
     }
-    return this.prisma.follow.create({
-      data: {
+    return this.prisma.follow.upsert({
+      where: {
+        followerId_followingId: {
+          followerId: userId,
+          followingId: createFollowDto.toUserId
+        }
+      },
+      update: {
+        active: true
+      },
+      create: {
         followerId: userId,
-        followingId: createFollowDto.toUserId
+        followingId: createFollowDto.toUserId,
+        active: true
       }
-    });
-  }
+    });  }
 
-  async unfollow(dto: CreateFollowDto, userId: string) {
-    if (userId === dto.toUserId) {
+  async unfollow(followingId: string, userId: string) {
+    if (userId === followingId) {
       throw new ConflictException('Cannot unfollow yourself');
     }
     const isFollow = await this.prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId: userId,
-          followingId: dto.toUserId
+          followingId: followingId
         },
         active: true
       }
@@ -56,7 +70,7 @@ export class FollowsService {
       where: {
         followerId_followingId: {
           followerId: userId,
-          followingId: dto.toUserId
+          followingId: followingId
         }
       },
       data: {

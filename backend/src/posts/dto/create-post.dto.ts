@@ -10,7 +10,7 @@ export class CreatePostDto {
     title: string;
 
     @IsString({ message: 'Content must be a string' })
-    @MinLength(10, { message: 'Content should be at least 10 characters long' })
+    @MinLength(8, { message: 'Content should be at least 8 characters long' })
     @Transform(({ value }) => value.trim())
     @ApiProperty({ example: 'This is the content of my first blog post.' })
     content: string;
@@ -29,6 +29,7 @@ export class CreatePostDto {
     @IsArray({ message: 'Tag IDs must be an array of strings' })
     @IsString({ each: true, message: 'Each tag ID must be a string' })
     @IsUUID('4', { each: true, message: 'Each tag ID must be a valid UUID' })
+    @IsOptional()
     tagIds?: string[];
 
     @ApiPropertyOptional({
@@ -45,6 +46,7 @@ export class CreatePostDto {
         example: '2024-12-31T23:59:59Z',
         required: false
     })
+    @IsOptional()
     publishedAt?: string;
 
 
@@ -55,6 +57,6 @@ export class CreatePostDto {
     })
     @IsOptional()
     @IsString({ message: 'Excerpt must be a string' })
-    @MinLength(10, { message: 'Excerpt should be at least 10 characters long' })
+    @MinLength(8, { message: 'Excerpt should be at least 8 characters long' })
     excerpt?: string;
 }

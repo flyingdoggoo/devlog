@@ -14,6 +14,7 @@ export interface Comment {
 }
 
 export interface CreateCommentDto {
+  postId: string;
   content: string;
   parentId?: string;
 }

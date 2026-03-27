@@ -73,7 +73,7 @@ export class PostsService {
   }
   async updatePost(id: string, updatePostDto: UpdatePostDto, authorId: string) {
     const { title, content, tagIds } = updatePostDto;
-    const slug = title ? slugify(title, { lower: true }) : undefined;
+    const slug = title ? await this.generateSlug(title) : undefined;
     return this.prisma.post.update({
       where: { id, authorId },
       data: {
