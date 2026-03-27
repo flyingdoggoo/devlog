@@ -22,7 +22,7 @@ export class AuthService {
         if(!credential){
             throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
         }
-        const hashPasswordVerify = bcrypt.compareSync(password, credential.passwordHash);
+        const hashPasswordVerify = await bcrypt.compare(password, credential.passwordHash);
         if(!hashPasswordVerify){
             throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
         }
@@ -51,35 +51,32 @@ export class AuthService {
         const accessTokenTTL = Number(this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900;
         const refreshTokenTTL = Number(this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')) || 604800;
         const accessToken = this.jwtService.sign({ userId } as Payload);
+        const isProduction = this.configService.get('NODE_ENV') === 'production';
+        const sameSite = isProduction ? 'None' : 'Lax';
+        const secureFlag = isProduction ? '; Secure' : '';
 
         const refreshToken = randomBytes(64).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
         const expires = new Date(Date.now() + refreshTokenTTL * 1000);
 
-        let effectiveSessionId = sessionId;
-        if (sessionId) {
-            const existingSession = await this.prisma.session.findUnique({ where: { id: sessionId } });
-            if (existingSession && existingSession.userId === userId) {
-                const updatedSession = await this.prisma.session.update({
-                    where: { id: sessionId },
-                    data: { refreshTokenHash, expires },
-                });
-                effectiveSessionId = updatedSession.id;
-            } else {
-                effectiveSessionId = undefined;
-            }
-        }
-
-        if (!effectiveSessionId) {
-            const newSession = await this.prisma.session.create({
-                data: { userId, refreshTokenHash, expires },
-            });
-            effectiveSessionId = newSession.id;
-        }
-
-        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=Lax`;
-        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=Lax`;
-        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=Lax`;
+        const session = await this.prisma.session.upsert({
+            where:{
+                id: sessionId || 'non-existent-session-id',
+            },
+            update: {
+                refreshTokenHash,
+                expires,
+            },
+            create: {
+                userId,
+                refreshTokenHash,
+                expires,
+            },
+        });
+        const effectiveSessionId = session.id;
+        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
         return [authCookie, refreshCookie, sessionCookie];
     }
 

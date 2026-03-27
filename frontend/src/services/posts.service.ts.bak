@@ -1,0 +1,41 @@
+import apiClient from '@services/api';
+import type { Post, CreatePostDto, UpdatePostDto } from '@types/post';
+import type { ApiResponse } from '@types/api';
+
+export const postsApi = {
+  // Get all posts
+  getAllPosts: async (params?: { page?: number; limit?: number }): Promise<ApiResponse<Post[]>> => {
+    const response = await apiClient.get('/posts', { params });
+    return response.data;
+  },
+
+  // Get post by ID
+  getPostById: async (id: string): Promise<ApiResponse<Post>> => {
+    const response = await apiClient.get(`/posts/${id}`);
+    return response.data;
+  },
+
+  // Get post by slug
+  getPostBySlug: async (slug: string): Promise<ApiResponse<Post>> => {
+    const response = await apiClient.get(`/posts/slug/${slug}`);
+    return response.data;
+  },
+
+  // Create new post
+  createPost: async (data: CreatePostDto): Promise<ApiResponse<Post>> => {
+    const response = await apiClient.post('/posts', data);
+    return response.data;
+  },
+
+  // Update post
+  updatePost: async (id: string, data: UpdatePostDto): Promise<ApiResponse<Post>> => {
+    const response = await apiClient.patch(`/posts/${id}`, data);
+    return response.data;
+  },
+
+  // Delete/Archive post
+  deletePost: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete(`/posts/${id}`);
+    return response.data;
+  },
+};

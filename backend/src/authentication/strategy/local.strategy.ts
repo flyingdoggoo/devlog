@@ -9,7 +9,12 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     constructor(private authService: AuthService){
         super({ usernameField: 'email' });
     }
-    async validate(email: string, password: string): Promise<CredentialAfterGuard> {
-        return this.authService.validateUserLocal(email, password);
+    async validate(email: string, password: string): Promise<CredentialAfterGuard | null> {
+        try{
+            return this.authService.validateUserLocal(email, password);
+        } catch (err) {
+            console.error('Error validating user in LocalStrategy:', err);
+            return null;
+        }
     }
 }

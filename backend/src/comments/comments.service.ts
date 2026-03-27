@@ -42,9 +42,7 @@ export class CommentsService {
       where: { id: postId, status: PostStatus.PUBLISHED }
     });
     if (!post) throw new NotFoundException('Post not found');
-    // tab
-    // tab tab tab
-    // ?????
+    
     const allComments = await this.prisma.comment.findMany({
       where: {
         postId,

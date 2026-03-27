@@ -1,0 +1,29 @@
+import apiClient from '@services/api';
+import type { Notification } from '@types/notification';
+import type { ApiResponse } from '@types/api';
+
+export const notificationsApi = {
+  // Get all notifications for current user
+  getAllNotifications: async (): Promise<ApiResponse<Notification[]>> => {
+    const response = await apiClient.get('/notification');
+    return response.data;
+  },
+
+  // Get notification by ID
+  getNotificationById: async (id: string): Promise<ApiResponse<Notification>> => {
+    const response = await apiClient.get(`/notification/${id}`);
+    return response.data;
+  },
+
+  // Mark notification as read
+  markAsRead: async (id: string): Promise<ApiResponse<Notification>> => {
+    const response = await apiClient.patch(`/notification/${id}`, { read: true });
+    return response.data;
+  },
+
+  // Delete notification
+  deleteNotification: async (id: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete(`/notification/${id}`);
+    return response.data;
+  },
+};

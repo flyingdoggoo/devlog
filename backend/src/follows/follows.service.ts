@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateFollowDto } from './dto/create-follow.dto';
 import { UpdateFollowDto } from './dto/update-follow.dto';
 import { PrismaService } from '@prisma/prisma.service';
-
+import { NotFoundException, HttpException, HttpStatus, ConflictException } from '@nestjs/common';
 @Injectable()
 export class FollowsService {
   constructor(private prisma: PrismaService) { }
@@ -11,10 +11,10 @@ export class FollowsService {
       where: { id: userId, active: true }
     });
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
     if (userId === createFollowDto.toUserId) {
-      throw new Error('Cannot follow yourself');
+      throw new ConflictException('Cannot follow yourself');
     }
     const isFollow = await this.prisma.follow.findUnique({
       where: {
@@ -26,7 +26,7 @@ export class FollowsService {
       }
     });
     if (isFollow) {
-      throw new Error('Already following');
+      throw new ConflictException('Already following');
     }
     return this.prisma.follow.create({
       data: {
@@ -38,7 +38,7 @@ export class FollowsService {
 
   async unfollow(dto: CreateFollowDto, userId: string) {
     if (userId === dto.toUserId) {
-      throw new Error('Cannot unfollow yourself');
+      throw new ConflictException('Cannot unfollow yourself');
     }
     const isFollow = await this.prisma.follow.findUnique({
       where: {
@@ -50,7 +50,7 @@ export class FollowsService {
       }
     });
     if (!isFollow) {
-      throw new Error('Not following');
+      throw new NotFoundException('Not following');
     }
     return this.prisma.follow.update({
       where: {

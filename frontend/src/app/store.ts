@@ -1,0 +1,13 @@
+import { configureStore } from '@reduxjs/toolkit';
+import { authReducer } from '@features/auth/auth.slice';
+
+// Tạm thời chỉ có auth reducer
+// Các reducers khác sẽ thêm sau khi hoàn thiện
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+  },
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

@@ -1,0 +1,29 @@
+import apiClient from '@services/api';
+import type { Comment, CreateCommentDto, UpdateCommentDto } from '@types/comment';
+import type { ApiResponse } from '@types/api';
+
+export const commentsApi = {
+  // Get all comments for a post (tree structure)
+  getCommentsByPostId: async (postId: string): Promise<ApiResponse<Comment[]>> => {
+    const response = await apiClient.get(`/posts/${postId}/comments`);
+    return response.data;
+  },
+
+  // Add comment to post
+  addComment: async (postId: string, data: CreateCommentDto): Promise<ApiResponse<Comment>> => {
+    const response = await apiClient.post(`/posts/${postId}/comments`, data);
+    return response.data;
+  },
+
+  // Update comment
+  updateComment: async (postId: string, commentId: string, data: UpdateCommentDto): Promise<ApiResponse<Comment>> => {
+    const response = await apiClient.patch(`/posts/${postId}/comments/${commentId}`, data);
+    return response.data;
+  },
+
+  // Delete comment
+  deleteComment: async (postId: string, commentId: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete(`/posts/${postId}/comments/${commentId}`);
+    return response.data;
+  },
+};

@@ -1,0 +1,23 @@
+import apiClient from '@services/api';
+import type { Like, LikeWithUser } from '@types/like';
+import type { ApiResponse } from '@types/api';
+
+export const likesApi = {
+  // Like a post
+  likePost: async (postId: string): Promise<ApiResponse<Like>> => {
+    const response = await apiClient.post(`/posts/${postId}/likes`);
+    return response.data;
+  },
+
+  // Unlike a post
+  unlikePost: async (postId: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete(`/posts/${postId}/likes`);
+    return response.data;
+  },
+
+  // Get users who liked a post
+  getLikesByPostId: async (postId: string): Promise<ApiResponse<LikeWithUser[]>> => {
+    const response = await apiClient.get(`/posts/${postId}/likes/users`);
+    return response.data;
+  },
+};

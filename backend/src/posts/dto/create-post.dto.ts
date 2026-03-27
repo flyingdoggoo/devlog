@@ -15,7 +15,7 @@ export class CreatePostDto {
     @ApiProperty({ example: 'This is the content of my first blog post.' })
     content: string;
 
-    @ApiPropertyOptional({ enum: PostStatus, default: 'DRAFT' })
+    @ApiPropertyOptional({ enum: PostStatus, default: 'PUBLISHED' })
     @IsEnum(PostStatus, { message: 'Status must be either DRAFT or PUBLISHED' })
     @IsOptional()
     status?: PostStatus;
