@@ -62,6 +62,14 @@ export class AuthController {
         return response.status(200).send();
     }
 
+    @Post('logout')
+    async logout(@Req() request: Request, @Res() response: Response) {
+        const sessionId = request.cookies?.SessionId;
+        const cookies = await this.authService.logout(sessionId);
+        response.setHeader('Set-Cookie', cookies);
+        return response.status(200).send();
+    }
+
     @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
     async register(@Body() registerDto: RegisterDto){

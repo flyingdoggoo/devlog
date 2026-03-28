@@ -20,6 +20,16 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   author?: User;
+  comments?: {
+    id: string;
+    content: string;
+    createdAt: string;
+    author?: {
+      id: string;
+      name: string | null;
+      avatarUrl?: string | null;
+    };
+  }[];
   tags?: PostTag[];
   _count?: {
     likes: number;
@@ -46,6 +56,7 @@ export interface CreatePostDto {
   tagIds?: string[];
   status?: PostStatus;
   publishedAt?: string;
+
 }
 
-export interface UpdatePostDto extends Partial<CreatePostDto> {}
+export interface UpdatePostDto extends Partial<CreatePostDto> { }

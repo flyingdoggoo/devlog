@@ -15,6 +15,7 @@ export class UsersService {
       select: {
         id: true,
         name: true,
+        avatarUrl: true,
         credentials: {
           select: {
             email: true,

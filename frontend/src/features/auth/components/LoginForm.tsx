@@ -49,7 +49,7 @@ export function LoginForm() {
       console.log('Login fulfilled, user:', result.payload);
       // State sẽ tự động update, useEffect sẽ redirect
     } else {
-      console.log('Login rejected:', result.error.message);
+      console.log('Login rejected:', result.error?.message ?? 'Unknown error');
     }
   };
 

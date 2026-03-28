@@ -50,6 +50,7 @@ model User {
   name                  String?
   createdAt             DateTime       @default(now())
   active                Boolean        @default(true)
+  avatarUrl             String?
   accounts              Account[]
   credentials           Credential[]
   sessions              Session[]

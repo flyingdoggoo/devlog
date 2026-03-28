@@ -12,10 +12,14 @@ const postInclude = {
       }
     }
   },
-  author: { select: { id: true, name: true } },
-  _count: { select:
-    { likes: { where: { active: true } },
-    comments: { where: { active: true } } } }
+  author: { select: { id: true, name: true, avatarUrl: true } },
+  _count: {
+    select:
+    {
+      likes: { where: { active: true } },
+      comments: { where: { active: true } }
+    }
+  }
 }
 @Injectable()
 export class PostsService {
@@ -51,13 +55,31 @@ export class PostsService {
       this.prisma.post.count({ where: { status: PostStatus.PUBLISHED } }),
       this.prisma.post.findMany({
         where: { status: PostStatus.PUBLISHED },
-        include: postInclude,
         skip,
         take: safeLimit,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          ...postInclude,
+          author: { select: { id: true, name: true, avatarUrl: true } },
+          comments: {
+            where: {
+              active: true,
+              parentId: null,
+              author: { active: true },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 2,
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+              author: { select: { id: true, name: true, avatarUrl: true } },
+            },
+          },
+        },
       })
-    ])
-    return { 
+    ]);
+    return {
       items,
       total,
       page: safePage,

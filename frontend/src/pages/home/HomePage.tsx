@@ -2,6 +2,7 @@ import { postsApi } from '@/services/posts.service';
 import { Post } from '@/types/post';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AvatarMenu } from '@/components/AvatarMenu';
 
 // Mock data cho demo
 // const mockPosts = [
@@ -95,7 +96,8 @@ export function HomePage() {
     if (loadingRef.current || !hasMoreRef.current) return;
     const viewportHeight = window.innerHeight;
     const fullHeight = document.documentElement.scrollHeight;
-    if (fullHeight <= viewportHeight + 40) {
+    // Only auto-load on initial mount or when content is too short
+    if (fullHeight <= viewportHeight + 40 && pageRef.current <= 3) {
       loadPosts(pageRef.current + 1);
     }
   }, [posts.length, loadPosts]);
@@ -128,13 +130,7 @@ export function HomePage() {
           <button className="p-2 rounded-full hover:bg-neutral-100 transition-colors">
             <span className="material-symbols-outlined text-neutral-600">notifications</span>
           </button>
-          <div className="h-8 w-8 rounded-full bg-neutral-200 overflow-hidden">
-            <img
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2IFCzzExA5GgA8HQHGlW71hI7Lm6l8Walk6nJxpljXGXT9C6Tom9Unb4r9Pk059PO5u4bH8xipeEYoAn5oItYAWWRiGlQuVO6b0H5EtE10I299ZlrXrdksIZiJA6C_xd3yoFs2bih47fRamz2YGpNXz4f-sIf7ZEiBT5iNouxAgnuVwqbgd8S6u_qrHaOeXd-xC3Zyk0cK_M8Igc9AEETeyl8ArKNa1JKG3-H_tKbvHFw2zBJuc3LXmHk7C6pE3v8b7qTo-IM9N0"
-              alt="Profile"
-            />
-          </div>
+          <AvatarMenu size="sm" />
         </div>
       </header>
 
@@ -170,7 +166,7 @@ export function HomePage() {
             className="bg-gradient-to-br from-black to-neutral-700 text-white rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 mb-4"
           >
             <span className="material-symbols-outlined text-sm">add</span>
-            New Entry
+            New Post
           </button>
 
           <div className="border-t border-neutral-200/50 pt-4 space-y-1">
@@ -200,8 +196,30 @@ export function HomePage() {
               const readTime = `${Math.max(1, Math.ceil(words / 200))}m read`;
 
               return (
-                <article key={post.id} className="group cursor-pointer">
+                <article key={post.id} className="group cursor-pointer" onClick={() => navigate(`/posts/${post.id}`)}>
                   <div className="bg-white p-8 rounded-xl transition-all duration-300 hover:bg-white border-transparent border hover:border-neutral-200/50">
+                    {/* 1) User header */}
+                    <div className="flex items-center gap-3 mb-4">
+                      {post.author?.avatarUrl ? (
+                        <img
+                          src={post.author.avatarUrl}
+                          alt={post.author?.name ?? 'User'}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold">
+                          {(post.author?.name?.[0] ?? 'U').toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-semibold">{post.author?.name ?? 'Unknown user'}</p>
+                        <p className="text-xs text-neutral-400">
+                          {new Date(post.createdAt).toLocaleDateString('vi-VN')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Title + tag */}
                     <div className="flex justify-between items-start mb-4">
                       <h2 className="text-2xl font-bold group-hover:underline underline-offset-4 decoration-1">
                         {post.title}
@@ -215,6 +233,7 @@ export function HomePage() {
                       {post.excerpt || post.content}
                     </p>
 
+                    {/* Stats */}
                     <div className="flex items-center gap-4 text-xs font-medium text-neutral-400">
                       <div className="flex items-center gap-1.5 hover:text-black transition-colors">
                         <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
@@ -226,7 +245,51 @@ export function HomePage() {
                       </div>
                       <span className="ml-auto">{readTime}</span>
                     </div>
+
+                    {/* 2) Comment preview */}
+                    <div className="mt-4 border-t border-neutral-200 pt-4 space-y-3">
+                      {post._count?.comments === 0 ? (
+                        <p className="text-sm text-neutral-500">
+                          No comments yet. Be the first to comment!
+                        </p>
+                      ) : (
+                        post.comments &&
+                        post.comments.length > 0 &&
+                        post.comments.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors"
+                          >
+                            {c.author?.avatarUrl ? (
+                              <img
+                                src={c.author.avatarUrl}
+                                alt={c.author?.name ?? 'User'}
+                                className="h-8 w-8 shrink-0 rounded-full object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            ) : (
+                              <div className="h-8 w-8 shrink-0 rounded-full bg-neutral-200 flex items-center justify-center text-xs font-semibold text-neutral-600">
+                                {(c.author?.name?.[0] ?? 'U').toUpperCase()}
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              <div className="rounded-2xl bg-neutral-100 px-3 py-2">
+                                <span className="text-sm font-medium text-neutral-900">
+                                  {c.author?.name ?? 'Anonymous'}
+                                </span>
+
+                                <p className="mt-1 line-clamp-2 break-words text-sm text-neutral-600">
+                                  {c.content}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
+
                 </article>
               );
             })}
@@ -234,6 +297,9 @@ export function HomePage() {
             {error && <p className="text-sm text-red-500">{error}</p>}
             {!hasMore && posts.length > 0 && (
               <p className="text-xs text-neutral-400 text-center">No more posts</p>
+            )}
+            {!loading && !error && posts.length === 0 && !hasMore && (
+              <p className="text-sm text-neutral-500 text-center">No posts yet. Be the first to write one!</p>
             )}
 
             {/* Snippet Card */}

@@ -2,6 +2,7 @@
 export interface User {
   id: string;
   name: string | null;
+  avatarUrl: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;

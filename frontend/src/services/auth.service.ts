@@ -1,4 +1,5 @@
 import apiClient from '@services/api';
+import type { ApiResponse } from '../types/api';
 
 export const authApi = {
   // Backend route: /auth/login (không có /api prefix)
@@ -22,8 +23,17 @@ export const authApi = {
   },
 
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get('/users/me');
-    return response.data;
+    const response = await apiClient.get<ApiResponse<BackendMeResponse>>('/users/me');
+    const raw = response.data.data;
+    const credential = raw.credentials?.[0];
+
+    return {
+      id: raw.id,
+      name: raw.name,
+      avatarUrl: raw.avatarUrl ?? null,
+      email: credential?.email,
+      username: credential?.username,
+    };
   },
 };
 
@@ -51,6 +61,17 @@ export interface AuthResponse {
 export interface User {
   id: string;
   name: string | null;
+  avatarUrl?: string | null;
   email?: string;
   username?: string;
+}
+
+interface BackendMeResponse {
+  id: string;
+  name: string | null;
+  avatarUrl?: string | null;
+  credentials?: Array<{
+    email?: string;
+    username?: string;
+  }>;
 }

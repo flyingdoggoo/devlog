@@ -5,6 +5,7 @@ import type { RootState } from '@app/store';
 export interface User {
   id: string;
   name: string | null;
+  avatarUrl?: string | null;
   email?: string;
   username?: string;
 }
