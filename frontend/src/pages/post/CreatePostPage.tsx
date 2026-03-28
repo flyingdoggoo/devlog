@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient from '@services/api';
+import { postsApi } from '@services/posts.service';
 
 export function CreatePostPage() {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ export function CreatePostPage() {
       setIsPublishing(true);
       setPublishError(null);
 
-      await apiClient.post('/posts', {
+      await postsApi.createPost({
         title: normalizedTitle,
         content: normalizedContent,
       });

@@ -1,36 +1,38 @@
-import { useState } from 'react';
+import { postsApi } from '@/services/posts.service';
+import { Post } from '@/types/post';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Mock data cho demo
-const mockPosts = [
-  {
-    id: '1',
-    title: 'Refactoring the Auth Middleware',
-    category: 'NODE.JS',
-    excerpt: 'Cleaned up the repetitive JWT validation logic today. Moved the validation to a higher-order function to support both Express and Fastify adapters.',
-    likes: 24,
-    comments: 8,
-    readTime: '4m read',
-  },
-  {
-    id: '2',
-    title: 'The CSS Grid Struggle is Real',
-    category: 'UI/UX',
-    excerpt: 'Implementing the new dashboard layout. Decided to go with a full-height grid structure. Ran into issues with `min-content` overflows.',
-    likes: 41,
-    comments: 12,
-    readTime: '6m read',
-  },
-  {
-    id: '3',
-    title: 'Switching to Rust for the CLI',
-    category: 'RUST',
-    excerpt: 'Finally bit the bullet. The memory safety and speed for the log parser are too good to ignore. The initial learning curve is steep.',
-    likes: 89,
-    comments: 34,
-    readTime: '12m read',
-  },
-];
+// const mockPosts = [
+//   {
+//     id: '1',
+//     title: 'Refactoring the Auth Middleware',
+//     category: 'NODE.JS',
+//     excerpt: 'Cleaned up the repetitive JWT validation logic today. Moved the validation to a higher-order function to support both Express and Fastify adapters.',
+//     likes: 24,
+//     comments: 8,
+//     readTime: '4m read',
+//   },
+//   {
+//     id: '2',
+//     title: 'The CSS Grid Struggle is Real',
+//     category: 'UI/UX',
+//     excerpt: 'Implementing the new dashboard layout. Decided to go with a full-height grid structure. Ran into issues with `min-content` overflows.',
+//     likes: 41,
+//     comments: 12,
+//     readTime: '6m read',
+//   },
+//   {
+//     id: '3',
+//     title: 'Switching to Rust for the CLI',
+//     category: 'RUST',
+//     excerpt: 'Finally bit the bullet. The memory safety and speed for the log parser are too good to ignore. The initial learning curve is steep.',
+//     likes: 89,
+//     comments: 34,
+//     readTime: '12m read',
+//   },
+// ];
 
 const suggestedUsers = [
   { name: 'Alex Rivers', role: 'Principal Engineer', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCTjXLedylR2lWZhSnmBzz1nCJJqnAwYHiihOvUeTXdMxCZmv2AiZN9CZuzBkO5jhAC2_gHQMyKnaf43xbNPoQju90ak3t-y4zcaIqUANz7KXaavECsC2yhl_AiR4Ao4UmPO4AUaNFxHWr4OFcpOjeu9mhTWXWY06NeyfNeNadFuGr6cWSn6bJrMC33DIE6NqqYXu3ungq3CcIlzJl5Sw_npKNd177tW2J5fJ-Hk16eV-f1tzw9kqOEhP2QbZCE3OuqlljezLmv_cM' },
@@ -40,7 +42,65 @@ const suggestedUsers = [
 const trendingTags = ['#typescript', '#rustlang', '#webgpu', '#refactoring', '#architecture'];
 
 export function HomePage() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const pageRef = useRef(1);
   const navigate = useNavigate();
+
+  const loadPosts = useCallback(async (nextPage: number) => {
+    if (loadingRef.current || !hasMoreRef.current) return;
+    setLoading(true);
+    loadingRef.current = true;
+    try {
+      const res = await postsApi.getAllPost(nextPage, 10);
+      console.log('Loaded posts:', res);
+      setPosts(prev => [...prev, ...res.items]);
+      setHasMore(res.hasMore);
+      hasMoreRef.current = res.hasMore;
+      pageRef.current = nextPage;
+    } catch (err: any) {
+      console.error('Failed to load posts:', err);
+      setError(err.message || 'Failed to load posts');
+    }
+    finally {
+      setLoading(false);
+      loadingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPosts(1);
+  }, [loadPosts]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (loadingRef.current || !hasMoreRef.current) return;
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const viewportHeight = window.innerHeight;
+      const fullHeight = document.documentElement.scrollHeight;
+      if (scrollTop + viewportHeight >= fullHeight - 320) {
+        loadPosts(pageRef.current + 1);
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [loadPosts]);
+
+  useEffect(() => {
+    if (loadingRef.current || !hasMoreRef.current) return;
+    const viewportHeight = window.innerHeight;
+    const fullHeight = document.documentElement.scrollHeight;
+    if (fullHeight <= viewportHeight + 40) {
+      loadPosts(pageRef.current + 1);
+    }
+  }, [posts.length, loadPosts]);
+
+
   const [currentDate] = useState(new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
@@ -105,7 +165,7 @@ export function HomePage() {
             </a>
           </nav>
 
-          <button 
+          <button
             onClick={() => navigate('/posts/create')}
             className="bg-gradient-to-br from-black to-neutral-700 text-white rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 mb-4"
           >
@@ -134,42 +194,55 @@ export function HomePage() {
 
           {/* Posts Feed */}
           <div className="space-y-12">
-            {mockPosts.map((post) => (
-              <article key={post.id} className="group cursor-pointer">
-                <div className="bg-white p-8 rounded-xl transition-all duration-300 hover:bg-white border-transparent border hover:border-neutral-200/50">
-                  <div className="flex justify-between items-start mb-4">
-                    <h2 className="text-2xl font-bold group-hover:underline underline-offset-4 decoration-1">
-                      {post.title}
-                    </h2>
-                    <span className="text-xs font-mono bg-neutral-200 px-2 py-1 rounded text-neutral-700">
-                      {post.category}
-                    </span>
-                  </div>
-                  <p className="text-neutral-600 leading-relaxed mb-6 line-clamp-3">
-                    {post.excerpt}
-                  </p>
-                  <div className="flex items-center gap-4 text-xs font-medium text-neutral-400">
-                    <div className="flex items-center gap-1.5 hover:text-black transition-colors">
-                      <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
-                      {post.likes}
+            {posts.map((post) => {
+              const tagName = post.tags?.[0]?.tag?.name ?? 'GENERAL';
+              const words = (post.content || '').trim().split(/\s+/).filter(Boolean).length;
+              const readTime = `${Math.max(1, Math.ceil(words / 200))}m read`;
+
+              return (
+                <article key={post.id} className="group cursor-pointer">
+                  <div className="bg-white p-8 rounded-xl transition-all duration-300 hover:bg-white border-transparent border hover:border-neutral-200/50">
+                    <div className="flex justify-between items-start mb-4">
+                      <h2 className="text-2xl font-bold group-hover:underline underline-offset-4 decoration-1">
+                        {post.title}
+                      </h2>
+                      <span className="text-xs font-mono bg-neutral-200 px-2 py-1 rounded text-neutral-700">
+                        {tagName}
+                      </span>
                     </div>
-                    <div className="flex items-center gap-1.5 hover:text-black transition-colors">
-                      <span className="material-symbols-outlined text-lg">chat_bubble</span>
-                      {post.comments}
+
+                    <p className="text-neutral-600 leading-relaxed mb-6 line-clamp-3">
+                      {post.excerpt || post.content}
+                    </p>
+
+                    <div className="flex items-center gap-4 text-xs font-medium text-neutral-400">
+                      <div className="flex items-center gap-1.5 hover:text-black transition-colors">
+                        <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                        {post._count?.likes ?? 0}
+                      </div>
+                      <div className="flex items-center gap-1.5 hover:text-black transition-colors">
+                        <span className="material-symbols-outlined text-lg">chat_bubble</span>
+                        {post._count?.comments ?? 0}
+                      </div>
+                      <span className="ml-auto">{readTime}</span>
                     </div>
-                    <span className="ml-auto">{post.readTime}</span>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
+            {loading && <p className="text-sm text-neutral-500">Loading posts...</p>}
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            {!hasMore && posts.length > 0 && (
+              <p className="text-xs text-neutral-400 text-center">No more posts</p>
+            )}
 
             {/* Snippet Card */}
             <div className="grid grid-cols-2 gap-8">
               <div className="bg-neutral-100 p-6 rounded-lg border border-neutral-200/50">
                 <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Snippet of the day</h3>
                 <code className="block text-xs font-mono text-black bg-white/50 p-4 rounded mb-4">
-                  const curate = (log) ={'>'} {'{'}<br/>
-                  &nbsp;&nbsp;return log.filter(e ={'>'} e.valuable);<br/>
+                  const curate = (log) ={'>'} {'{'}<br />
+                  &nbsp;&nbsp;return log.filter(e ={'>'} e.valuable);<br />
                   {'}'}
                 </code>
                 <p className="text-xs text-neutral-500">Keeping only what matters in the daily log.</p>

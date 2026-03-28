@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Query} from '@nestjs/common';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -18,8 +18,8 @@ export class PostsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all posts' })
-  findAllPosts() {
-    return this.postsService.findAllPosts();
+  findAllPosts(@Query('page') page = '1', @Query('limit') limit = '10') {
+    return this.postsService.findAllPosts(Number(page), Number(limit));
   }
 
   @Get(':id')

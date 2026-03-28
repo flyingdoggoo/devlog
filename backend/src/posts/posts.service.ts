@@ -43,14 +43,26 @@ export class PostsService {
     });
   }
 
-  async findAllPosts() {
-    const posts = await this.prisma.post.findMany({
-      where: { status: { in: [PostStatus.PUBLISHED, PostStatus.DRAFT] } },
-      include: postInclude
-    });
-    return {
-      total: posts.length,
-      items: posts
+  async findAllPosts(page = 1, limit = 10) {
+    const safePage = Math.max(page, 1);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const skip = (safePage - 1) * safeLimit;
+    const [total, items] = await Promise.all([
+      this.prisma.post.count({ where: { status: PostStatus.PUBLISHED } }),
+      this.prisma.post.findMany({
+        where: { status: PostStatus.PUBLISHED },
+        include: postInclude,
+        skip,
+        take: safeLimit,
+        orderBy: { createdAt: 'desc' }
+      })
+    ])
+    return { 
+      items,
+      total,
+      page: safePage,
+      limit: safeLimit,
+      hasMore: skip + items.length < total
     };
   }
 
