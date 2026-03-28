@@ -124,7 +124,10 @@ export class UsersService {
     });
   }
 
-  async removeUserById(userId: string) {
+  async removeUserById(userId: string, userPerformingActionId: string) {
+    if (userId !== userPerformingActionId) {
+      throw new Error('You can only deactivate your own account');
+    }
     return this.prisma.user.update({
       where: { id: userId, active: true },
       data: { active: false },
