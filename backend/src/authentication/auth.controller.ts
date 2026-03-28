@@ -40,6 +40,9 @@ export class AuthController {
     @UseGuards(GoogleAuthGuard)
     async googleLoginCallback(@Req() req: RequestWithGoogleUser, @Res() response: Response) {
         const googleUser = req.user;
+        if(!googleUser){
+            return response.status(401).send({ message: 'Google authentication failed' });
+        }
         const cookies = await this.authService.loginWithGoogle(googleUser);
         const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
         response.setHeader('Set-Cookie', cookies);
@@ -52,10 +55,17 @@ export class AuthController {
         const sessionId = request.cookies?.SessionId;
 
         if (!refreshToken || !sessionId) {
-            return response.status(401).send({ message: 'Refresh token is missing' });
-        }
-
+            return response.status(401).send({ message: 'Refresh token or session ID is missing' });
+        }    
         const cookies = await this.authService.refreshSession(refreshToken, sessionId);
+        response.setHeader('Set-Cookie', cookies);
+        return response.status(200).send();
+    }
+
+    @Post('logout')
+    async logout(@Req() request: Request, @Res() response: Response) {
+        const sessionId = request.cookies?.SessionId;
+        const cookies = await this.authService.logout(sessionId);
         response.setHeader('Set-Cookie', cookies);
         return response.status(200).send();
     }

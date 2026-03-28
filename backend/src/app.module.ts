@@ -8,6 +8,9 @@ import { AuthModule } from '@authentication/auth.module';
 import { PostsModule } from './posts/posts.module';
 import { NotificationModule } from './notification/notification.module';
 import { TagsModule } from './tags/tags.module';
+import { LikesModule } from './likes/likes.module';
+import { CommentsModule } from './comments/comments.module';
+import { FollowsModule } from './follows/follows.module';
 @Module({
   imports: [UsersModule, PrismaModule, AuthModule,
     ConfigModule.forRoot({
@@ -15,7 +18,10 @@ import { TagsModule } from './tags/tags.module';
     }),
     PostsModule,
     NotificationModule,
-    TagsModule
+    TagsModule,
+    LikesModule,
+    CommentsModule,
+    FollowsModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -50,6 +50,7 @@ model User {
   name                  String?
   createdAt             DateTime       @default(now())
   active                Boolean        @default(true)
+  avatarUrl             String?
   accounts              Account[]
   credentials           Credential[]
   sessions              Session[]
@@ -113,6 +114,7 @@ model Comment {
   authorId  String
   content   String
   parentId  String?
+  active    Boolean  @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
@@ -120,7 +122,7 @@ model Comment {
   post      Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User      @relation(fields: [authorId], references: [id])
 
-  @@index([postId, createdAt])
+  @@index([postId, active, createdAt])
   @@index([authorId])
 }
 
@@ -128,27 +130,29 @@ model Like {
   id        String   @id @default(uuid())
   postId    String
   userId    String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId])
-  @@index([postId])
+  @@index([postId, active])
 }
 
 model Follow {
   id          String   @id @default(uuid())
   followerId  String
   followingId String
+  active      Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
   following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
+  @@index([followerId, active])
+  @@index([followingId, active])
 }
 
 enum NotificationType {

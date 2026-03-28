@@ -1,0 +1,29 @@
+import apiClient from '@services/api';
+import type { Follow } from '@types/follow';
+import type { ApiResponse } from '@types/api';
+
+export const followsApi = {
+  // Follow a user
+  followUser: async (toUserId: string): Promise<ApiResponse<Follow>> => {
+    const response = await apiClient.post('/follows', { toUserId });
+    return response.data;
+  },
+
+  // Unfollow a user
+  unfollowUser: async (toUserId: string): Promise<ApiResponse<void>> => {
+    const response = await apiClient.delete('/follows', { data: { toUserId } });
+    return response.data;
+  },
+
+  // Get current user's followers
+  getFollowers: async (): Promise<ApiResponse<Follow[]>> => {
+    const response = await apiClient.get('/follows/followers');
+    return response.data;
+  },
+
+  // Get users that current user follows
+  getFollowing: async (): Promise<ApiResponse<Follow[]>> => {
+    const response = await apiClient.get('/follows/following');
+    return response.data;
+  },
+};

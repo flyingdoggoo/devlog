@@ -16,27 +16,27 @@ export class AuthService {
         private jwtService: JwtService,
         private configService: ConfigService,
         private prisma: PrismaService,
-    ){}
-    async validateUserLocal(email: string, password: string){
+    ) { }
+    async validateUserLocal(email: string, password: string) {
         const credential = await this.userService.findByEmail(email);
-        if(!credential){
+        if (!credential) {
             throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
         }
-        const hashPasswordVerify = bcrypt.compareSync(password, credential.passwordHash);
-        if(!hashPasswordVerify){
+        const hashPasswordVerify = await bcrypt.compare(password, credential.passwordHash);
+        if (!hashPasswordVerify) {
             throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
         }
 
         return credential;
     }
-    async validateUserJwt(userId: string){
+    async validateUserJwt(userId: string) {
         const user = await this.prisma.user.findUnique({
             where: {
                 id: userId,
                 active: true,
             },
         });
-        if(!user){
+        if (!user) {
             throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
         }
         return {
@@ -51,40 +51,37 @@ export class AuthService {
         const accessTokenTTL = Number(this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900;
         const refreshTokenTTL = Number(this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')) || 604800;
         const accessToken = this.jwtService.sign({ userId } as Payload);
+        const isProduction = this.configService.get('NODE_ENV') === 'production';
+        const sameSite = isProduction ? 'None' : 'Lax';
+        const secureFlag = isProduction ? '; Secure' : '';
 
         const refreshToken = randomBytes(64).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
         const expires = new Date(Date.now() + refreshTokenTTL * 1000);
 
-        let effectiveSessionId = sessionId;
-        if (sessionId) {
-            const existingSession = await this.prisma.session.findUnique({ where: { id: sessionId } });
-            if (existingSession && existingSession.userId === userId) {
-                const updatedSession = await this.prisma.session.update({
-                    where: { id: sessionId },
-                    data: { refreshTokenHash, expires },
-                });
-                effectiveSessionId = updatedSession.id;
-            } else {
-                effectiveSessionId = undefined;
-            }
-        }
-
-        if (!effectiveSessionId) {
-            const newSession = await this.prisma.session.create({
-                data: { userId, refreshTokenHash, expires },
-            });
-            effectiveSessionId = newSession.id;
-        }
-
-        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=Lax`;
-        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=Lax`;
-        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=Lax`;
+        const session = await this.prisma.session.upsert({
+            where: {
+                id: sessionId || 'non-existent-session-id',
+            },
+            update: {
+                refreshTokenHash,
+                expires,
+            },
+            create: {
+                userId,
+                refreshTokenHash,
+                expires,
+            },
+        });
+        const effectiveSessionId = session.id;
+        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
         return [authCookie, refreshCookie, sessionCookie];
     }
 
     // Local login thanh cong se cap session theo userId.
-    async loginByUserId(userId: string){
+    async loginByUserId(userId: string) {
         return this.issueSessionCookies(userId);
     }
 
@@ -110,6 +107,12 @@ export class AuthService {
 
         const existingCredential = await this.userService.findByEmail(googleUser.email);
         if (existingCredential) {
+            const user = await this.prisma.user.findUnique({
+                where: { id: existingCredential.userId },
+            });
+            if (!user || !user.active) {
+                throw new HttpException('Account is deactivated', HttpStatus.UNAUTHORIZED);
+            }
             await this.prisma.account.create({
                 data: {
                     userId: existingCredential.userId,
@@ -118,29 +121,35 @@ export class AuthService {
                 },
             });
 
-            const user = await this.prisma.user.findUnique({
-                where: { id: existingCredential.userId },
-            });
-            if (user && !user.name && googleUser.name) {
+            if (user && (!user.name || !user.avatarUrl)) {
                 await this.prisma.user.update({
                     where: { id: existingCredential.userId },
-                    data: { name: googleUser.name },
+                    data: {
+                        name: user.name ?? googleUser.name,
+                        avatarUrl: user.avatarUrl ?? googleUser.profileUrl,
+                    },
                 });
             }
 
             return this.issueSessionCookies(existingCredential.userId);
         }
 
-        let username = `user-${randomBytes(4).toString('hex')}`;
-        while (await this.userService.findByUsername(username)) {
+        const MAX_RETRIES = 10;
+        let username: string;
+        let attempts = 0;
+        do {
             username = `user-${randomBytes(4).toString('hex')}`;
-        }
-        const randomPassword = randomBytes(32).toString('hex');
+            attempts++;
+            if (attempts > MAX_RETRIES) {
+                throw new HttpException('Failed to generate unique username', HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        } while (await this.userService.findByUsername(username)); const randomPassword = randomBytes(32).toString('hex');
         const passwordHash = await bcrypt.hash(randomPassword, 10);
 
         const createdUser = await this.prisma.user.create({
             data: {
                 name: googleUser.name,
+                avatarUrl: googleUser.profileUrl,
                 credentials: {
                     create: {
                         email: googleUser.email,
@@ -183,13 +192,31 @@ export class AuthService {
         return this.issueSessionCookies(session.userId, session.id);
     }
 
-    async register(registerDto: RegisterDto){
+    async logout(sessionId?: string) {
+        if (sessionId) {
+            await this.prisma.session.deleteMany({
+                where: { id: sessionId },
+            });
+        }
+
+        const isProduction = this.configService.get('NODE_ENV') === 'production';
+        const sameSite = isProduction ? 'None' : 'Lax';
+        const secureFlag = isProduction ? '; Secure' : '';
+
+        const authCookie = `Authentication=; HttpOnly; Path=/; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+
+        return [authCookie, refreshCookie, sessionCookie];
+    }
+
+    async register(registerDto: RegisterDto) {
         const { email, password, confirmPassword, username } = registerDto;
         if (password !== confirmPassword) {
             throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
         }
         const existingUser = await this.userService.findByEmail(email) || await this.userService.findByUsername(username);
-        if(existingUser){
+        if (existingUser) {
             throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
         }
         return this.userService.createUser(registerDto);
