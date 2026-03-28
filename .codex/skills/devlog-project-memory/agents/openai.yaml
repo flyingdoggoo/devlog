@@ -1,0 +1,3 @@
+interface:
+  display_name: "Devlog Project Memory"
+  short_description: "Persistent FE/BE context memory for the DevLog repo"
