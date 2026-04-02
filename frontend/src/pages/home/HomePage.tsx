@@ -1,51 +1,65 @@
 import { postsApi } from '@/services/posts.service';
+import { tagsApi } from '@/services/tags.service';
+import { usersApi } from '@/services/users.service';
 import { Post } from '@/types/post';
+import { Tag } from '@/types/tag';
+import { User } from '@/types/user';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AvatarMenu } from '@/components/AvatarMenu';
+import { useAppSelector } from '@/app/hooks';
+import { selectCurrentUser } from '@/features/auth/auth.slice';
 
-// Mock data cho demo
-// const mockPosts = [
-//   {
-//     id: '1',
-//     title: 'Refactoring the Auth Middleware',
-//     category: 'NODE.JS',
-//     excerpt: 'Cleaned up the repetitive JWT validation logic today. Moved the validation to a higher-order function to support both Express and Fastify adapters.',
-//     likes: 24,
-//     comments: 8,
-//     readTime: '4m read',
-//   },
-//   {
-//     id: '2',
-//     title: 'The CSS Grid Struggle is Real',
-//     category: 'UI/UX',
-//     excerpt: 'Implementing the new dashboard layout. Decided to go with a full-height grid structure. Ran into issues with `min-content` overflows.',
-//     likes: 41,
-//     comments: 12,
-//     readTime: '6m read',
-//   },
-//   {
-//     id: '3',
-//     title: 'Switching to Rust for the CLI',
-//     category: 'RUST',
-//     excerpt: 'Finally bit the bullet. The memory safety and speed for the log parser are too good to ignore. The initial learning curve is steep.',
-//     likes: 89,
-//     comments: 34,
-//     readTime: '12m read',
-//   },
-// ];
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
-const suggestedUsers = [
-  { name: 'Alex Rivers', role: 'Principal Engineer', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCTjXLedylR2lWZhSnmBzz1nCJJqnAwYHiihOvUeTXdMxCZmv2AiZN9CZuzBkO5jhAC2_gHQMyKnaf43xbNPoQju90ak3t-y4zcaIqUANz7KXaavECsC2yhl_AiR4Ao4UmPO4AUaNFxHWr4OFcpOjeu9mhTWXWY06NeyfNeNadFuGr6cWSn6bJrMC33DIE6NqqYXu3ungq3CcIlzJl5Sw_npKNd177tW2J5fJ-Hk16eV-f1tzw9kqOEhP2QbZCE3OuqlljezLmv_cM' },
-  { name: 'Sarah Chen', role: 'OSS Maintainer', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBLk9zFsd95aqV3TgPzkQRWJ2Uh0zl6-y4yOo7IFKJYME7VR5SwHWDk4VgXE-NSLx6idgv9qEuaT7M549_WD_5rQDCuiEQ0hDHYDNw-dlH6LWY78IXT4ge4u7b724GJqnW5HYHTmT8ildXUeFvvhFu04PNU7NpSeHPHEtxQSg64kolAuC7az266VWCjy5NXQEioJYWdq9Ir2OM4XJeGtlOQ-tm7v7D--eCp7buHsTnyYZ1lXdMqRMpRd_bqamKfoLdBsviI9FimMJk' },
-];
+function getCurrentStreak(posts: Post[]) {
+  const dateKeys = new Set(posts.map((post) => formatDateKey(new Date(post.createdAt))));
+  const today = new Date();
+  let streak = 0;
 
-const trendingTags = ['#typescript', '#rustlang', '#webgpu', '#refactoring', '#architecture'];
+  while (true) {
+    const cursor = new Date(today);
+    cursor.setDate(today.getDate() - streak);
+    const key = formatDateKey(cursor);
+    if (!dateKeys.has(key)) {
+      break;
+    }
+    streak += 1;
+  }
+
+  return streak;
+}
+
+function buildLast7DaysHeights(posts: Post[]) {
+  const dayCounts = new Map<string, number>();
+  for (const post of posts) {
+    const key = formatDateKey(new Date(post.createdAt));
+    dayCounts.set(key, (dayCounts.get(key) ?? 0) + 1);
+  }
+
+  const values = Array.from({ length: 7 }).map((_, idx) => {
+    const day = new Date();
+    day.setDate(day.getDate() - (6 - idx));
+    return dayCounts.get(formatDateKey(day)) ?? 0;
+  });
+
+  const max = Math.max(...values, 1);
+  return values.map((value) => Math.max(8, Math.round((value / max) * 40)));
+}
 
 export function HomePage() {
+  const currentUser = useAppSelector(selectCurrentUser);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [sidebarLoading, setSidebarLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
@@ -76,6 +90,28 @@ export function HomePage() {
   useEffect(() => {
     loadPosts(1);
   }, [loadPosts]);
+
+  useEffect(() => {
+    const fetchSidebarData = async () => {
+      setSidebarLoading(true);
+      try {
+        const [allTags, allUsers] = await Promise.all([tagsApi.getAllTags(), usersApi.getAllUsers()]);
+        setTags(allTags.slice(0, 8));
+        setSuggestedUsers(
+          allUsers
+            .filter((user) => user.id !== currentUser?.id)
+            .slice(0, 5),
+        );
+      } catch {
+        setTags([]);
+        setSuggestedUsers([]);
+      } finally {
+        setSidebarLoading(false);
+      }
+    };
+
+    fetchSidebarData();
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -110,6 +146,10 @@ export function HomePage() {
     hour: '2-digit',
     minute: '2-digit'
   }));
+
+  const postStreak = getCurrentStreak(posts);
+  const activeDays = new Set(posts.map((post) => formatDateKey(new Date(post.createdAt)))).size;
+  const activityBarHeights = buildLast7DaysHeights(posts);
 
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c]">
@@ -170,10 +210,13 @@ export function HomePage() {
           </button>
 
           <div className="border-t border-neutral-200/50 pt-4 space-y-1">
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
+            <button
+              className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg"
+              onClick={() => navigate('/settings')}
+            >
               <span className="material-symbols-outlined text-lg">settings</span>
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Settings</span>
-            </a>
+            </button>
             <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
               <span className="material-symbols-outlined text-lg">help_outline</span>
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Help</span>
@@ -190,6 +233,26 @@ export function HomePage() {
 
           {/* Posts Feed */}
           <div className="space-y-12">
+            {loading && posts.length === 0 && (
+              <div className="space-y-6 animate-pulse">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="bg-white p-8 rounded-xl border border-neutral-200/60 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-neutral-200" />
+                      <div className="space-y-2 flex-1">
+                        <div className="h-3 w-32 bg-neutral-200 rounded" />
+                        <div className="h-3 w-24 bg-neutral-200 rounded" />
+                      </div>
+                    </div>
+                    <div className="h-7 w-2/3 bg-neutral-200 rounded" />
+                    <div className="h-4 w-full bg-neutral-200 rounded" />
+                    <div className="h-4 w-5/6 bg-neutral-200 rounded" />
+                    <div className="h-4 w-1/3 bg-neutral-200 rounded" />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {posts.map((post) => {
               const tagName = post.tags?.[0]?.tag?.name ?? 'GENERAL';
               const words = (post.content || '').trim().split(/\s+/).filter(Boolean).length;
@@ -293,7 +356,11 @@ export function HomePage() {
                 </article>
               );
             })}
-            {loading && <p className="text-sm text-neutral-500">Loading posts...</p>}
+            {loading && posts.length > 0 && (
+              <div className="bg-white p-6 rounded-xl border border-neutral-200/60 animate-pulse">
+                <div className="h-4 w-32 bg-neutral-200 rounded" />
+              </div>
+            )}
             {error && <p className="text-sm text-red-500">{error}</p>}
             {!hasMore && posts.length > 0 && (
               <p className="text-xs text-neutral-400 text-center">No more posts</p>
@@ -329,16 +396,16 @@ export function HomePage() {
               <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Daily Streak</span>
               <span className="material-symbols-outlined text-orange-500" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
             </div>
-            <div className="text-3xl font-bold font-['Space_Grotesk'] mb-2">14 Days</div>
+            <div className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{postStreak} Days</div>
             <div className="flex gap-1.5">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="h-1.5 flex-1 rounded-full bg-black"></div>
+                <div key={i} className={`h-1.5 flex-1 rounded-full ${i < Math.min(postStreak, 5) ? 'bg-black' : 'bg-neutral-200'}`}></div>
               ))}
               {[...Array(2)].map((_, i) => (
-                <div key={i + 5} className="h-1.5 flex-1 rounded-full bg-neutral-200"></div>
+                <div key={i + 5} className={`h-1.5 flex-1 rounded-full ${i + 5 < Math.min(postStreak, 7) ? 'bg-black' : 'bg-neutral-200'}`}></div>
               ))}
             </div>
-            <p className="text-[11px] text-neutral-400 mt-3">Keep it up! 3 more days to reach Gold Curator status.</p>
+            <p className="text-[11px] text-neutral-400 mt-3">{activeDays} active posting days in your current feed window.</p>
           </div>
 
           {/* Trending Tags */}
@@ -348,15 +415,20 @@ export function HomePage() {
               <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Trending Tags</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              {trendingTags.map((tag) => (
-                <a
-                  key={tag}
-                  className="text-[11px] font-mono bg-neutral-200 px-3 py-1.5 rounded-full hover:bg-neutral-300 transition-colors"
-                  href="#"
-                >
-                  {tag}
-                </a>
+              {sidebarLoading && Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="h-7 w-20 rounded-full bg-neutral-200 animate-pulse" />
               ))}
+              {!sidebarLoading && tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="text-[11px] font-mono bg-neutral-200 px-3 py-1.5 rounded-full"
+                >
+                  #{tag.name}
+                </span>
+              ))}
+              {!sidebarLoading && tags.length === 0 && (
+                <span className="text-[11px] text-neutral-500">No tags yet</span>
+              )}
             </div>
           </div>
 
@@ -367,18 +439,39 @@ export function HomePage() {
               <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Suggested Users</h3>
             </div>
             <div className="space-y-4">
-              {suggestedUsers.map((user) => (
-                <div key={user.name} className="flex items-center gap-3 group cursor-pointer">
-                  <img className="w-8 h-8 rounded-full" src={user.avatar} alt={user.name} />
-                  <div className="flex-1">
-                    <p className="text-xs font-bold group-hover:underline">{user.name}</p>
-                    <p className="text-[10px] text-neutral-400">{user.role}</p>
+              {sidebarLoading && Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="flex items-center gap-3 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-neutral-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 w-24 bg-neutral-200 rounded" />
+                    <div className="h-3 w-16 bg-neutral-200 rounded" />
                   </div>
-                  <button className="text-[10px] font-bold border border-neutral-200 px-2 py-1 rounded hover:bg-black hover:text-white transition-all">
-                    FOLLOW
+                </div>
+              ))}
+              {!sidebarLoading && suggestedUsers.map((user) => (
+                <div key={user.id} className="flex items-center gap-3 group cursor-pointer">
+                  {user.avatarUrl ? (
+                    <img className="w-8 h-8 rounded-full object-cover" src={user.avatarUrl} alt={user.name ?? user.username} />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center text-[10px] font-bold text-neutral-600">
+                      {(user.name?.[0] ?? user.username[0] ?? 'U').toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-xs font-bold group-hover:underline">{user.name ?? user.username}</p>
+                    <p className="text-[10px] text-neutral-400">@{user.username}</p>
+                  </div>
+                  <button
+                    className="text-[10px] font-bold border border-neutral-200 px-2 py-1 rounded hover:bg-black hover:text-white transition-all"
+                    onClick={() => navigate(`/profile/${user.username}`)}
+                  >
+                    VIEW
                   </button>
                 </div>
               ))}
+              {!sidebarLoading && suggestedUsers.length === 0 && (
+                <p className="text-[11px] text-neutral-500">No suggestions right now.</p>
+              )}
             </div>
           </div>
 
@@ -391,14 +484,14 @@ export function HomePage() {
             <div className="p-4 bg-neutral-100 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-[11px] text-neutral-500 font-medium">Log Volume</span>
-                <span className="text-[11px] font-bold text-green-600">+12%</span>
+                <span className="text-[11px] font-bold text-green-600">{posts.length} posts loaded</span>
               </div>
               <div className="flex items-end gap-1 h-12">
-                {[4, 6, 8, 5, 10, 7, 9].map((height, i) => (
+                {activityBarHeights.map((height, i) => (
                   <div
                     key={i}
                     className={`w-full rounded-t-sm ${i === 4 ? 'bg-black' : 'bg-neutral-300'}`}
-                    style={{ height: `${height * 4}px` }}
+                    style={{ height: `${height}px` }}
                   ></div>
                 ))}
               </div>

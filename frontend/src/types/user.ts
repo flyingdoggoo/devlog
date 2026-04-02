@@ -2,6 +2,7 @@
 export interface User {
   id: string;
   name: string | null;
+  username: string;
   avatarUrl: string | null;
   active: boolean;
   createdAt: string;
@@ -11,11 +12,6 @@ export interface User {
 export interface Credential {
   userId: string;
   email: string;
-  username: string;
   passwordHash: string;
 }
 
-export interface UserProfile extends User {
-  email?: string;
-  username?: string;
-}

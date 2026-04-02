@@ -47,7 +47,15 @@ export function AppRouter() {
         }
       />
       <Route
-        path="/profile"
+        path="/profile/:username"
+        element={
+          <AuthGuard>
+            <ProfilePage />
+          </AuthGuard>
+        }
+      />
+      <Route
+        path='/profile/me'
         element={
           <AuthGuard>
             <ProfilePage />

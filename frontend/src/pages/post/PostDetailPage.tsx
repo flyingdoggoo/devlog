@@ -89,8 +89,18 @@ export function PostDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] flex items-center justify-center">
-        <p className="text-sm text-neutral-500">Loading post...</p>
+      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] p-8 animate-pulse">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <div className="h-5 w-40 bg-neutral-200 rounded" />
+          <div className="h-12 w-4/5 bg-neutral-200 rounded" />
+          <div className="h-4 w-60 bg-neutral-200 rounded" />
+          <div className="space-y-3">
+            <div className="h-4 w-full bg-neutral-200 rounded" />
+            <div className="h-4 w-full bg-neutral-200 rounded" />
+            <div className="h-4 w-5/6 bg-neutral-200 rounded" />
+          </div>
+          <div className="h-32 bg-neutral-200 rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -380,7 +390,7 @@ export function PostDetailPage() {
                 </p>
                 <button
                   className="w-full bg-white border border-neutral-300 py-2 rounded-lg text-xs font-bold hover:bg-black hover:text-white transition-all"
-                  onClick={() => navigate('/profile')}
+                  onClick={() => navigate('/profile/' + (post.author?.username ?? ''))}
                 >
                   View Profile
                 </button>

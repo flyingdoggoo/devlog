@@ -20,7 +20,8 @@
 - `/` and `/home` -> dashboard feed
 - `/posts/create` -> create post page
 - `/posts/:id` -> post detail page
-- `/profile` -> personal profile page
+- `/profile/me` -> personal profile page
+- `/profile/:userId` -> Other user profile page
 - `/settings` -> settings placeholder page
 
 ### Important pages

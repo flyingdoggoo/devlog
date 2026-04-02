@@ -12,7 +12,7 @@ const postInclude = {
       }
     }
   },
-  author: { select: { id: true, name: true, avatarUrl: true } },
+  author: { select: { id: true, username: true, name: true, avatarUrl: true } },
   _count: {
     select:
     {
@@ -60,7 +60,7 @@ export class PostsService {
         orderBy: { createdAt: 'desc' },
         include: {
           ...postInclude,
-          author: { select: { id: true, name: true, avatarUrl: true } },
+          author: { select: { id: true, username: true, name: true, avatarUrl: true } },
           comments: {
             where: {
               active: true,
@@ -73,7 +73,7 @@ export class PostsService {
               id: true,
               content: true,
               createdAt: true,
-              author: { select: { id: true, name: true, avatarUrl: true } },
+              author: { select: { id: true, username: true, name: true, avatarUrl: true } },
             },
           },
         },

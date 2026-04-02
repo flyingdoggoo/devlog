@@ -24,7 +24,7 @@ export const ROUTES = {
   POST_DETAIL: '/posts/:slug',
   CREATE_POST: '/posts/create',
   EDIT_POST: '/posts/:slug/edit',
-  PROFILE: '/profile',
+  PROFILE: '/profile/:username',
   SETTINGS: '/settings',
   USERS: '/users',
   USER_PROFILE: '/users/:id',

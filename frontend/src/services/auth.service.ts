@@ -32,7 +32,7 @@ export const authApi = {
       name: raw.name,
       avatarUrl: raw.avatarUrl ?? null,
       email: credential?.email,
-      username: credential?.username,
+      username: raw.username,
     };
   },
 };
@@ -69,9 +69,9 @@ export interface User {
 interface BackendMeResponse {
   id: string;
   name: string | null;
+  username: string;
   avatarUrl?: string | null;
   credentials?: Array<{
     email?: string;
-    username?: string;
   }>;
 }

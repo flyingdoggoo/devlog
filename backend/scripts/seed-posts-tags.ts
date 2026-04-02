@@ -56,7 +56,6 @@ async function ensureSeedAuthor() {
       credentials: {
         create: {
           email,
-          username,
           passwordHash,
         },
       },

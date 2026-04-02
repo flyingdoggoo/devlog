@@ -19,7 +19,7 @@ export class CommentsService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId, active: true },
-      select: { id: true, name: true, avatarUrl: true }
+      select: { id: true, username: true, name: true, avatarUrl: true }
     });
     if (!user)
       throw new NotFoundException('User not found');
@@ -51,7 +51,7 @@ export class CommentsService {
       },
       orderBy: { createdAt: 'asc' },
       include: {
-        author: { select: { id: true, name: true, avatarUrl: true } }
+        author: { select: { id: true, username: true, name: true, avatarUrl: true } }
       }
     });
 

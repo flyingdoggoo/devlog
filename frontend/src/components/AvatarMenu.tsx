@@ -86,12 +86,22 @@ export function AvatarMenu({ size = 'sm' }: AvatarMenuProps) {
           >
             Create Post
           </button>
+          
+           <button
+            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+            onClick={() => goTo('/profile/me')}
+          >
+            View Profile
+          </button>
+          <div className="border-t border-neutral-200 my-2"></div>
           <button
             className="w-full text-left px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
             onClick={onLogout}
           >
             Log out
           </button>
+
+         
         </div>
       )}
     </div>
