@@ -51,12 +51,12 @@ async function ensureSeedAuthor() {
 
   const createdUser = await prisma.user.create({
     data: {
+      username,
       name: 'Seed Author',
       active: true,
       credentials: {
         create: {
           email,
-          username,
           passwordHash,
         },
       },

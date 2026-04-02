@@ -1,74 +1,185 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '@app/hooks';
 import { selectCurrentUser } from '@features/auth/auth.slice';
 import { AvatarMenu } from '@components/AvatarMenu';
-
-const stackTags = ['TYPESCRIPT', 'NEXT.JS', 'TAILWIND', 'GRAPHQL', 'DOCKER'];
-const recentLogs = [
-  {
-    id: 1,
-    tags: ['React', 'Patterns'],
-    ago: '2 hours ago',
-    title: 'Re-thinking state management in distributed systems',
-    excerpt:
-      'Explored how the actor model could simplify complex local state syncing. The trade-offs between eventual consistency and developer experience are starting to clarify...',
-    likes: 124,
-    comments: 18,
-  },
-  {
-    id: 2,
-    tags: ['Rust', 'Safety'],
-    ago: 'Yesterday',
-    title: 'The beauty of the Borrow Checker: A love letter',
-    excerpt:
-      "It is frustrating at first, but once you realize it's preventing the 2 AM debugging sessions you used to have in C++, the appreciation grows...",
-    likes: 89,
-    comments: 12,
-  },
-];
+import { usersApi, type UserProfile } from '@services/users.service';
+import axios from 'axios';
+import {
+  BarChart3,
+  Bell,
+  Bookmark,
+  CalendarDays,
+  Compass,
+  Heart,
+  Home,
+  Mail,
+  MessageCircle,
+  Plus,
+  Search,
+  Settings,
+  Share2,
+  TrendingUp,
+  User,
+  Users,
+} from 'lucide-react';
 
 const intensityClasses = ['bg-[#ececec]', 'bg-[#d7d7d7]', 'bg-[#a9a9a9]', 'bg-black'];
+const HEATMAP_CELLS = 52 * 7;
+
+function getErrorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) {
+      return message.join(', ');
+    }
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Something went wrong';
+}
+
+function formatJoinedDate(dateString?: string) {
+  if (!dateString) return 'Unknown';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function buildHeatmapLevels(posts: UserProfile['posts']) {
+  const byDay = new Map<string, number>();
+
+  for (const post of posts) {
+    const day = new Date(post.createdAt).toISOString().slice(0, 10);
+    byDay.set(day, (byDay.get(day) ?? 0) + 1);
+  }
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - HEATMAP_CELLS + 1);
+
+  return Array.from({ length: HEATMAP_CELLS }).map((_, idx) => {
+    const day = new Date(startDate);
+    day.setDate(startDate.getDate() + idx);
+    const key = day.toISOString().slice(0, 10);
+    const count = byDay.get(key) ?? 0;
+
+    if (count === 0) return 0;
+    if (count === 1) return 1;
+    if (count <= 3) return 2;
+    return 3;
+  });
+}
 
 export function ProfilePage() {
   const navigate = useNavigate();
+  const { username } = useParams<{ username: string }>();
   const currentUser = useAppSelector(selectCurrentUser);
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [profileImageError, setProfileImageError] = useState(false);
 
-  const displayName = currentUser?.name || 'Developer';
-  const initials = (displayName[0] || 'U').toUpperCase();
-  const profileAvatar = currentUser?.avatarUrl || '';
+  const isMeRoute = !username;
+  const isOwnProfile = !!currentUser && !!profile && currentUser.id === profile.id;
 
-  const heatmapLevels = useMemo(
-    () =>
-      Array.from({ length: 52 * 7 }).map((_, idx) => {
-        const seed = (idx * 17 + 13) % 100;
-        if (seed < 45) return 0;
-        if (seed < 70) return 1;
-        if (seed < 88) return 2;
-        return 3;
-      }),
-    [],
-  );
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = isMeRoute
+          ? await usersApi.getMyProfile()
+          : await usersApi.getProfileByUsername(username || '');
+
+        setProfile(data);
+        setProfileImageError(false);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [isMeRoute, username]);
+
+  const displayName = profile?.name || profile?.username || 'Developer';
+  const initials = (displayName[0] || 'U').toUpperCase();
+  const profileAvatar = profile?.avatarUrl || '';
+
+  const heatmapLevels = useMemo(() => buildHeatmapLevels(profile?.posts ?? []), [profile?.posts]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] p-8 animate-pulse">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <div className="h-10 w-40 bg-neutral-200 rounded" />
+          <div className="flex gap-6 items-start">
+            <div className="w-28 h-28 rounded-xl bg-neutral-200" />
+            <div className="flex-1 space-y-3">
+              <div className="h-8 w-64 bg-neutral-200 rounded" />
+              <div className="h-4 w-40 bg-neutral-200 rounded" />
+              <div className="h-4 w-56 bg-neutral-200 rounded" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="h-24 bg-neutral-200 rounded-xl" />
+            <div className="h-24 bg-neutral-200 rounded-xl" />
+            <div className="h-24 bg-neutral-200 rounded-xl" />
+          </div>
+          <div className="space-y-4">
+            <div className="h-5 w-36 bg-neutral-200 rounded" />
+            <div className="h-28 bg-neutral-200 rounded-xl" />
+            <div className="h-28 bg-neutral-200 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] flex items-center justify-center px-6">
+        <div className="text-center">
+          <p className="text-sm text-red-600 font-medium">{error ?? 'Profile not found'}</p>
+          <button
+            className="mt-4 px-4 py-2 rounded-md bg-black text-white text-sm"
+            onClick={() => navigate('/home')}
+          >
+            Back to home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#f9f9f9] text-[#1a1c1c] min-h-screen font-body">
       <nav className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/60 z-50">
         <div className="flex items-center gap-8">
           <button
-            className="text-2xl font-bold font-['Space_Grotesk'] text-black"
+            className="text-2xl font-bold font-['Space_Grotesk'] text-black tap-feedback"
             onClick={() => navigate('/home')}
           >
             DevLog
           </button>
           <div className="hidden md:flex items-center gap-6">
             <button
-              className="text-neutral-500 font-medium hover:bg-neutral-100 transition-colors duration-150 px-3 py-1 rounded"
+              className="text-neutral-500 font-medium hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 px-3 py-1 rounded tap-feedback"
               onClick={() => navigate('/home')}
             >
               Home
             </button>
-            <button className="text-neutral-500 font-medium hover:bg-neutral-100 transition-colors duration-150 px-3 py-1 rounded">
+            <button className="text-neutral-500 font-medium hover:bg-emerald-50 hover:text-emerald-700 transition-colors duration-150 px-3 py-1 rounded tap-feedback">
               Explore
             </button>
             <button className="text-black font-bold border-b-2 border-black px-3 py-1">
@@ -79,17 +190,15 @@ export function ProfilePage() {
 
         <div className="flex items-center gap-4">
           <div className="relative hidden sm:block">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">
-              search
-            </span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-600" />
             <input
-              className="bg-[#f1f1f1] border-none focus:ring-0 rounded-full pl-10 pr-4 py-1.5 text-sm w-44 transition-all focus:w-60"
+              className="bg-[#f1f1f1] border border-transparent focus:ring-2 focus:ring-sky-200 hover:border-sky-200 rounded-full pl-10 pr-4 py-1.5 text-sm w-56 transition-all"
               placeholder="Search logs..."
               type="text"
             />
           </div>
-          <button className="material-symbols-outlined p-2 rounded-full hover:bg-neutral-100 transition-all">
-            notifications
+          <button className="p-2.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all tap-feedback">
+            <Bell className="h-4 w-4" />
           </button>
 
           <AvatarMenu size="sm" />
@@ -102,35 +211,35 @@ export function ProfilePage() {
           <p className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Developer Logs</p>
         </div>
         <button
-          className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg"
+          className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card"
           onClick={() => navigate('/home')}
         >
-          <span className="material-symbols-outlined">home</span>
+          <Home className="h-4 w-4 text-sky-600" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Home</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-          <span className="material-symbols-outlined">explore</span>
+        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+          <Compass className="h-4 w-4 text-emerald-600" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Explore</span>
         </button>
         <button className="text-black bg-[#e2e2e2] px-4 py-2 flex items-center gap-3 rounded-lg">
-          <span className="material-symbols-outlined">person</span>
+          <User className="h-4 w-4 text-violet-600" />
           <span className="font-['Inter'] text-sm font-semibold tracking-wide">Profile</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-          <span className="material-symbols-outlined">bookmark</span>
+        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+          <Bookmark className="h-4 w-4 text-blue-700" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Bookmarks</span>
         </button>
 
         <div className="mt-auto border-t border-neutral-200/40 pt-4">
           <button
-            className="w-full bg-black text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity mb-4"
+            className="w-full bg-white border border-blue-300 text-blue-700 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:bg-blue-50 transition-all mb-4 tap-feedback"
             onClick={() => navigate('/posts/create')}
           >
-            <span className="material-symbols-outlined text-sm">add</span>
-            New Entry
+            <Plus className="h-4 w-4" />
+            Create Post
           </button>
-          <button className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-            <span className="material-symbols-outlined">settings</span>
+          <button className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+            <Settings className="h-4 w-4 text-amber-600" />
             <span className="font-['Inter'] text-sm font-medium tracking-wide">Settings</span>
           </button>
         </div>
@@ -159,56 +268,58 @@ export function ProfilePage() {
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                   <h1 className="text-4xl font-['Space_Grotesk'] font-bold tracking-tight">{displayName}</h1>
-                  <p className="text-neutral-500 font-medium">@{displayName.toLowerCase().replace(/\s+/g, '_')} • Senior Frontend Engineer</p>
+                  <p className="text-neutral-500 font-medium">@{profile.username}</p>
                 </div>
-                <div className="flex gap-2">
-                  <button className="px-4 py-2 rounded-md bg-white border border-neutral-200 hover:border-neutral-400 text-sm font-medium transition-all">
-                    Edit Profile
-                  </button>
-                  <button className="px-4 py-2 rounded-md bg-black text-white text-sm font-medium hover:opacity-90 transition-all">
-                    Follow
-                  </button>
-                </div>
+                {isOwnProfile && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-3 py-1 rounded-full bg-black text-white text-xs font-semibold uppercase tracking-wider">
+                      Your profile
+                    </span>
+                    <button
+                      className="px-3 py-1 rounded-full border border-neutral-300 text-xs font-semibold uppercase tracking-wider hover:bg-neutral-100"
+                      onClick={() => navigate('/settings')}
+                    >
+                      Edit in settings
+                    </button>
+                  </div>
+                )}
               </div>
-
-              <p className="text-neutral-600 leading-relaxed max-w-2xl">
-                Building accessible interfaces at the intersection of design and engineering. Currently
-                documenting the journey through distributed systems and modern web standards.
-              </p>
 
               <div className="flex flex-wrap gap-4 text-sm font-medium">
                 <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm">location_on</span> San Francisco
+                  <CalendarDays className="h-4 w-4 text-sky-600" />
+                  Joined {formatJoinedDate(profile.createdAt)}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm">link</span> devlog.app
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm">calendar_today</span> Joined March 2021
-                </span>
+                {isOwnProfile && profile.credentials?.[0]?.email && (
+                  <span className="flex items-center gap-1.5 text-neutral-600">
+                    <Mail className="h-4 w-4 text-emerald-600" />
+                    {profile.credentials[0].email}
+                  </span>
+                )}
               </div>
+
             </div>
           </section>
 
           <section className="grid grid-cols-1 md:grid-cols-3 gap-1 bg-neutral-100 rounded-xl overflow-hidden p-1">
             <div className="bg-white p-6 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-['Space_Grotesk'] font-bold">482</span>
+              <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.posts}</span>
               <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Total Posts</span>
             </div>
             <div className="bg-white p-6 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-['Space_Grotesk'] font-bold">14</span>
-              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Day Streak</span>
+              <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.followers}</span>
+              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Followers</span>
             </div>
             <div className="bg-white p-6 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-['Space_Grotesk'] font-bold">12.4k</span>
-              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Total Reach</span>
+              <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.following}</span>
+              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Following</span>
             </div>
           </section>
 
           <section className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-['Space_Grotesk'] font-bold text-lg tracking-tight">Journal Contributions</h3>
-              <span className="text-xs text-neutral-500 font-medium">Year: 2026</span>
+              <span className="text-xs text-neutral-500 font-medium">Last 364 days</span>
             </div>
             <div className="bg-white p-6 rounded-xl border border-neutral-200/80">
               <div className="heatmap-grid mb-4">
@@ -231,42 +342,53 @@ export function ProfilePage() {
           <section className="space-y-6">
             <h3 className="font-['Space_Grotesk'] font-bold text-2xl tracking-tight">Recent Logs</h3>
             <div className="space-y-4">
-              {recentLogs.map((item) => (
+              {profile.posts.map((item) => (
                 <div
                   key={item.id}
-                  className="group p-6 bg-white rounded-xl border border-transparent hover:border-neutral-300/60 transition-all"
+                  className="group p-6 bg-white rounded-xl border border-transparent hover:border-neutral-300/60 transition-all interactive-card"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex gap-2">
-                      {item.tags.map((tag) => (
+                      {item.tags.map((entry) => (
                         <span
-                          key={tag}
+                          key={`${item.id}-${entry.tag.name}`}
                           className="bg-neutral-200 text-neutral-700 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
                         >
-                          {tag}
+                          {entry.tag.name}
                         </span>
                       ))}
                     </div>
-                    <span className="text-xs text-neutral-500 font-medium italic">{item.ago}</span>
+                    <span className="text-xs text-neutral-500 font-medium italic">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
 
-                  <h4 className="text-xl font-['Space_Grotesk'] font-bold group-hover:text-neutral-700 transition-colors cursor-pointer">
+                  <h4
+                    className="text-xl font-['Space_Grotesk'] font-bold group-hover:text-neutral-700 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/posts/${item.id}`)}
+                  >
                     {item.title}
                   </h4>
-                  <p className="mt-2 text-neutral-600 line-clamp-2 leading-relaxed">{item.excerpt}</p>
+                  <p className="mt-2 text-neutral-600 line-clamp-2 leading-relaxed">{item.content}</p>
                   <div className="mt-4 flex items-center gap-6 text-xs font-medium text-neutral-500">
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">favorite</span> {item.likes}
+                      <Heart className="h-4 w-4 text-rose-500" /> {item._count.likes}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">chat_bubble</span> {item.comments}
+                      <MessageCircle className="h-4 w-4 text-blue-600" /> {item._count.comments}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">share</span>
+                      <Share2 className="h-4 w-4 text-emerald-600" />
                     </span>
                   </div>
                 </div>
               ))}
+
+              {profile.posts.length === 0 && (
+                <div className="p-6 bg-white rounded-xl border border-neutral-200 text-sm text-neutral-500">
+                  No posts yet.
+                </div>
+              )}
             </div>
 
             <button className="w-full py-4 text-xs font-bold uppercase tracking-[0.2em] text-neutral-500 hover:text-black transition-colors border-t border-neutral-200 mt-4">
@@ -284,24 +406,24 @@ export function ProfilePage() {
             </h3>
             <div className="space-y-4">
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">trending_up</span>
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
                 <div>
-                  <p className="text-xs font-semibold text-black">Trending Tags</p>
-                  <p className="text-[10px] text-neutral-500">#Rust, #Wasm, #Zig</p>
+                  <p className="text-xs font-semibold text-black">Published Posts</p>
+                  <p className="text-[10px] text-neutral-500">{profile._count.posts} published entries</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">group</span>
+                <Users className="h-4 w-4 text-blue-600" />
                 <div>
-                  <p className="text-xs font-semibold text-black">Suggested Users</p>
-                  <p className="text-[10px] text-neutral-500">Follow 12 new peers</p>
+                  <p className="text-xs font-semibold text-black">Network</p>
+                  <p className="text-[10px] text-neutral-500">{profile._count.followers} followers • {profile._count.following} following</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">insights</span>
+                <BarChart3 className="h-4 w-4 text-violet-600" />
                 <div>
-                  <p className="text-xs font-semibold text-black">Activity Stats</p>
-                  <p className="text-[10px] text-neutral-500">+15% engagement this week</p>
+                  <p className="text-xs font-semibold text-black">Comments</p>
+                  <p className="text-[10px] text-neutral-500">{profile._count.comments} comments in total</p>
                 </div>
               </div>
             </div>
@@ -309,15 +431,14 @@ export function ProfilePage() {
 
           <div className="space-y-4 pt-8 border-t border-neutral-200">
             <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest text-neutral-500 font-semibold">
-              Current Stack
+              Profile URL
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {stackTags.map((tag) => (
-                <span key={tag} className="px-3 py-1 bg-neutral-200 rounded text-[10px] font-bold">
-                  {tag}
-                </span>
-              ))}
-            </div>
+            <button
+              onClick={() => navigate(`/profile/${profile.username}`)}
+              className="text-left text-xs text-neutral-700 underline underline-offset-4"
+            >
+              /profile/{profile.username}
+            </button>
           </div>
         </div>
       </aside>

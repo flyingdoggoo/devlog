@@ -16,6 +16,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root {
+  --accent-sky: #0284c7;
+  --accent-blue: #2563eb;
+  --accent-emerald: #059669;
+  --accent-amber: #d97706;
+  --accent-rose: #e11d48;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Space Grotesk', sans-serif;
 }
@@ -38,4 +46,110 @@ code, pre {
 .heatmap-cell {
   aspect-ratio: 1 / 1;
   border-radius: 1px;
+}
+
+@keyframes routeFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.route-transition {
+  animation: routeFadeIn 220ms ease-out both;
+}
+
+.interactive-card {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 30px -26px rgba(15, 23, 42, 0.65);
+}
+
+.interactive-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.tap-feedback {
+  transition: transform 120ms ease;
+}
+
+.tap-feedback:active {
+  transform: scale(0.96);
+}
+
+@keyframes likePulse {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.like-button {
+  border-radius: 9999px;
+  padding: 2px 8px;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    transform 120ms ease;
+}
+
+.like-button:hover {
+  color: var(--accent-rose);
+  background-color: rgba(225, 29, 72, 0.1);
+  transform: translateY(-1px);
+}
+
+.like-button:active {
+  transform: scale(0.96);
+}
+
+.like-button.is-liked {
+  color: var(--accent-rose);
+  background-color: rgba(225, 29, 72, 0.12);
+}
+
+.like-button.is-liked .like-icon {
+  animation: likePulse 320ms ease-out;
+}
+
+.icon-badge {
+  border-radius: 9999px;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.icon-badge:hover {
+  transform: translateY(-1px);
+}
+
+.icon-badge:active {
+  transform: scale(0.95);
+}
+
+.icon-badge-search {
+  color: var(--accent-sky);
+}
+
+.icon-badge-bell {
+  color: var(--accent-amber);
+  background-color: rgba(217, 119, 6, 0.1);
+}
+
+.icon-badge-bell:hover {
+  background-color: rgba(217, 119, 6, 0.16);
 }

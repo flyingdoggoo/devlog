@@ -1,9 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-
-// Không cần baseURL vì đã có proxy trong vite.config.ts
-// /api → tự động proxy đến http://localhost:3000/api
-
 export const apiClient = axios.create({
+  baseURL: '/api', 
   headers: {
     'Content-Type': 'application/json',
   },

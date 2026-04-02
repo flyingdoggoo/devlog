@@ -3,10 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { postsApi } from '@services/posts.service';
 import apiClient from '@services/api';
 import { AvatarMenu } from '@components/AvatarMenu';
+import { useRequireAuthAction } from '@hooks/useRequireAuthAction';
 import type { Post } from '@/types/post';
 import type { Comment } from '@/types/comment';
 import type { ApiResponse } from '@/types/api';
-
+import { selectIsAuthenticated } from '@/features/auth/auth.slice';
+import { useAppSelector } from '@app/hooks';
+import { ArrowUp, Bell, Bookmark, Heart, MessageCircle, Search, Share2 } from 'lucide-react';
 function formatDate(dateInput?: string | null) {
   if (!dateInput) return 'Unknown date';
   return new Date(dateInput).toLocaleDateString('en-US', {
@@ -25,6 +28,8 @@ function getReadTime(content?: string) {
 export function PostDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { requireAuthAction } = useRequireAuthAction();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -32,6 +37,7 @@ export function PostDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [readingProgress, setReadingProgress] = useState(0);
   const [newComment, setNewComment] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
     if (!id) {
@@ -87,10 +93,55 @@ export function PostDetailPage() {
     [comments],
   );
 
+  const handlePostComment = async () => {
+    if (!id || !newComment.trim()) return;
+    if (!requireAuthAction()) return;
+
+    try {
+      setPostingComment(true);
+      setError(null);
+
+      await apiClient.post<ApiResponse<Comment>>(`/posts/${id}/comments`, {
+        content: newComment.trim(),
+      });
+
+      const commentsRes = await apiClient.get<ApiResponse<Comment[]>>(`/posts/${id}/comments`);
+      setComments(commentsRes.data.data ?? []);
+      setNewComment('');
+
+      setPost((prev) =>
+        prev
+          ? {
+              ...prev,
+              _count: {
+                likes: prev._count?.likes ?? 0,
+                comments: (prev._count?.comments ?? 0) + 1,
+              },
+            }
+          : prev,
+      );
+    } catch (err: any) {
+      const msg = err?.response?.data?.message;
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Failed to post comment');
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] flex items-center justify-center">
-        <p className="text-sm text-neutral-500">Loading post...</p>
+      <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c] p-8 animate-pulse">
+        <div className="max-w-5xl mx-auto space-y-8">
+          <div className="h-5 w-40 bg-neutral-200 rounded" />
+          <div className="h-12 w-4/5 bg-neutral-200 rounded" />
+          <div className="h-4 w-60 bg-neutral-200 rounded" />
+          <div className="space-y-3">
+            <div className="h-4 w-full bg-neutral-200 rounded" />
+            <div className="h-4 w-full bg-neutral-200 rounded" />
+            <div className="h-4 w-5/6 bg-neutral-200 rounded" />
+          </div>
+          <div className="h-32 bg-neutral-200 rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -138,14 +189,34 @@ export function PostDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
-            <button className="p-2 hover:bg-neutral-200/50 rounded-md transition-all duration-150">
-              <span className="material-symbols-outlined text-neutral-900">search</span>
+            <button className="p-2 hover:bg-sky-100 hover:text-sky-700 rounded-md transition-all duration-150 tap-feedback">
+              <Search className="h-4 w-4" />
             </button>
-            <button className="p-2 hover:bg-neutral-200/50 rounded-md transition-all duration-150 relative">
-              <span className="material-symbols-outlined text-neutral-900">notifications</span>
-              <span className="absolute top-2 right-2 w-2 h-2 bg-black rounded-full border border-white" />
-            </button>
-            <AvatarMenu size="md" />
+            <div className="flex items-center gap-4">
+          {isAuthenticated ? (
+            <>
+              <button className="p-2.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors tap-feedback">
+                <Bell className="h-4 w-4" />
+              </button>
+              <AvatarMenu size="sm" />
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 text-neutral-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all tap-feedback"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-all tap-feedback"
+              >
+                Create Account
+              </button>
+            </>
+          )}
+        </div>
           </div>
         </nav>
       </header>
@@ -173,19 +244,19 @@ export function PostDetailPage() {
               </div>
 
               <div className="bg-white/70 backdrop-blur-xl border border-neutral-200/40 flex flex-col gap-6 p-3 rounded-full shadow-sm">
-                <button className="flex flex-col items-center gap-1 group">
-                  <span className="material-symbols-outlined text-neutral-600 group-hover:text-black transition-colors">favorite</span>
+                <button className="flex flex-col items-center gap-1 group" onClick={() => requireAuthAction()}>
+                  <Heart className="h-4 w-4 text-neutral-600 group-hover:text-rose-600 transition-colors" />
                   <span className="text-[10px] font-bold text-neutral-600">{post._count?.likes ?? 0}</span>
                 </button>
                 <button className="flex flex-col items-center gap-1 group">
-                  <span className="material-symbols-outlined text-neutral-600 group-hover:text-black transition-colors">chat_bubble</span>
+                  <MessageCircle className="h-4 w-4 text-neutral-600 group-hover:text-blue-600 transition-colors" />
                   <span className="text-[10px] font-bold text-neutral-600">{post._count?.comments ?? 0}</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 group">
-                  <span className="material-symbols-outlined text-neutral-600 group-hover:text-black transition-colors">bookmark</span>
+                <button className="flex flex-col items-center gap-1 group" onClick={() => requireAuthAction()}>
+                  <Bookmark className="h-4 w-4 text-neutral-600 group-hover:text-violet-600 transition-colors" />
                 </button>
                 <button className="flex flex-col items-center gap-1 group">
-                  <span className="material-symbols-outlined text-neutral-600 group-hover:text-black transition-colors">share</span>
+                  <Share2 className="h-4 w-4 text-neutral-600 group-hover:text-emerald-600 transition-colors" />
                 </button>
               </div>
             </div>
@@ -232,7 +303,10 @@ export function PostDetailPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm">{post.author?.name ?? 'Unknown author'}</span>
-                      <button className="text-[11px] font-bold text-black px-2 py-0.5 border border-black rounded-md hover:bg-black hover:text-white transition-all">
+                      <button
+                        className="text-[11px] font-bold text-black px-2 py-0.5 border border-black rounded-md hover:bg-black hover:text-white transition-all"
+                        onClick={() => requireAuthAction()}
+                      >
                         Follow
                       </button>
                     </div>
@@ -279,9 +353,10 @@ export function PostDetailPage() {
                   </div>
                   <button
                     className="bg-black text-white px-4 py-1.5 rounded-md text-xs font-bold hover:opacity-90 transition-all disabled:opacity-50"
-                    disabled={!newComment.trim()}
+                    disabled={!newComment.trim() || postingComment}
+                    onClick={handlePostComment}
                   >
-                    Post Comment
+                    {postingComment ? 'Posting...' : 'Post Comment'}
                   </button>
                 </div>
               </div>
@@ -309,10 +384,16 @@ export function PostDetailPage() {
                       </div>
                       <p className="text-sm text-neutral-600 leading-relaxed">{comment.content}</p>
                       <div className="flex gap-4 mt-3">
-                        <button className="text-[10px] font-bold text-neutral-500 hover:text-black uppercase tracking-tighter">
+                        <button
+                          className="text-[10px] font-bold text-neutral-500 hover:text-black uppercase tracking-tighter"
+                          onClick={() => requireAuthAction()}
+                        >
                           Reply
                         </button>
-                        <button className="text-[10px] font-bold text-neutral-500 hover:text-black uppercase tracking-tighter">
+                        <button
+                          className="text-[10px] font-bold text-neutral-500 hover:text-black uppercase tracking-tighter"
+                          onClick={() => requireAuthAction()}
+                        >
                           Like
                         </button>
                       </div>
@@ -380,7 +461,7 @@ export function PostDetailPage() {
                 </p>
                 <button
                   className="w-full bg-white border border-neutral-300 py-2 rounded-lg text-xs font-bold hover:bg-black hover:text-white transition-all"
-                  onClick={() => navigate('/profile')}
+                  onClick={() => navigate('/profile/' + (post.author?.username ?? ''))}
                 >
                   View Profile
                 </button>
@@ -434,10 +515,10 @@ export function PostDetailPage() {
       </footer>
 
       <button
-        className="fixed bottom-8 right-8 w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-xl hover:-translate-y-1 transition-all z-40"
+        className="fixed bottom-8 right-8 w-12 h-12 bg-gradient-to-r from-blue-600 to-emerald-500 text-white rounded-full flex items-center justify-center shadow-xl hover:-translate-y-1 transition-all z-40 tap-feedback"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
       >
-        <span className="material-symbols-outlined">keyboard_arrow_up</span>
+        <ArrowUp className="h-5 w-5" />
       </button>
     </div>
   );

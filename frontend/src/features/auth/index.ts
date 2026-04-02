@@ -1,5 +1,5 @@
 export { authReducer } from './auth.slice';
-export { login, loginWithGoogle, logoutThunk as logout, checkAuth } from './auth.thunks';
+export { login, register, loginWithGoogle, logoutThunk as logout, checkAuth } from './auth.thunks';
 export { LoginForm } from './components/LoginForm';
 export { LoginPage } from '../../pages/auth/LoginPage';
 

@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '@app/hooks';
 import { selectAuthInitialized, selectIsAuthenticated } from '@features/auth/auth.slice';
 
@@ -9,6 +9,7 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const initialized = useAppSelector(selectAuthInitialized);
+  const location = useLocation();
 
   if (!initialized) {
     return null;
@@ -16,7 +17,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
   
   // Nếu chưa login → redirect về /login
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    const from = `${location.pathname}${location.search}`;
+    return <Navigate to="/login" replace state={{ from }} />;
   }
   
   // Đã login → render children

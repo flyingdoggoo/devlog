@@ -1,61 +1,106 @@
 import { useState, FormEvent, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@components/ui/Card';
 import { Input } from '@components/ui/Input';
 import { Button } from '@components/ui/Button';
 import { Checkbox } from '@components/ui/Checkbox';
 import { SocialButton } from '@components/ui/SocialButton';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
-import { login, loginWithGoogle } from '@features/auth/auth.thunks';
-import { clearError, selectIsAuthenticated, selectAuthLoading, selectAuthError } from '@features/auth/auth.slice';
+import { login, register, loginWithGoogle } from '@features/auth/auth.thunks';
+import {
+  clearError,
+  selectIsAuthenticated,
+  selectAuthLoading,
+  selectAuthError,
+} from '@features/auth/auth.slice';
+
+type AuthLocationState = {
+  from?: string;
+};
 
 export function LoginForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
-  
-  // Select từ Redux state
+
   const loading = useAppSelector(selectAuthLoading);
   const error = useAppSelector(selectAuthError);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  
+
+  const isRegisterMode = location.pathname === '/register';
+  const from = (location.state as AuthLocationState | null)?.from;
+  const safeRedirect = from && from !== '/login' && from !== '/register' ? from : '/';
+
+  const [localError, setLocalError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
+    username: '',
     email: '',
     password: '',
+    confirmPassword: '',
     remember: false,
   });
 
-  // Redirect nếu đã login
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('User authenticated, redirecting to home...');
-      navigate('/');
+      navigate(safeRedirect, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, safeRedirect]);
+
+  useEffect(() => {
+    setLocalError(null);
+    dispatch(clearError());
+  }, [dispatch, isRegisterMode]);
+
+  const onFieldChange = (field: keyof typeof formData, value: string | boolean) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (localError) setLocalError(null);
+    if (error) dispatch(clearError());
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    console.log('Submitting login form...');
-    
-    // Dispatch login action
-    const result = await dispatch(login({
-      email: formData.email,
-      password: formData.password,
-      remember: formData.remember,
-    }));
-    
-    // Check nếu login thành công
-    if (login.fulfilled.match(result)) {
-      console.log('Login fulfilled, user:', result.payload);
-      // State sẽ tự động update, useEffect sẽ redirect
-    } else {
+
+    if (isRegisterMode) {
+      if (!formData.username.trim()) {
+        setLocalError('Username is required');
+        return;
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        setLocalError('Passwords do not match');
+        return;
+      }
+
+      const result = await dispatch(
+        register({
+          username: formData.username.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          confirmPassword: formData.confirmPassword,
+        }),
+      );
+
+      if (register.rejected.match(result)) {
+        console.log('Register rejected:', result.error?.message ?? 'Unknown error');
+      }
+
+      return;
+    }
+
+    const result = await dispatch(
+      login({
+        email: formData.email.trim(),
+        password: formData.password,
+        remember: formData.remember,
+      }),
+    );
+
+    if (login.rejected.match(result)) {
       console.log('Login rejected:', result.error?.message ?? 'Unknown error');
     }
   };
 
   const handleSocialLogin = (provider: 'github' | 'google') => {
-    console.log('Social login with:', provider);
-    
     if (provider === 'google') {
       dispatch(loginWithGoogle());
     }
@@ -65,123 +110,138 @@ export function LoginForm() {
     navigate('/forgot-password');
   };
 
-  const handleCreateAccount = () => {
-    navigate('/register');
-  };
-
-  const handleInputChange = () => {
-    if (error) {
-      dispatch(clearError());
-    }
-  };
+  const displayError = localError || error;
 
   return (
     <Card className="w-full max-w-[420px] mx-auto">
       <CardContent className="p-8">
-        {/* Tabs */}
         <div className="flex w-full border-b border-[#333333] mb-8 relative">
-          <button className="w-1/2 pb-3 text-white text-sm font-medium relative text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className={`w-1/2 pb-3 text-sm font-medium relative text-center transition-colors ${
+              isRegisterMode ? 'text-gray-500 hover:text-gray-300' : 'text-white'
+            }`}
+          >
             Sign In
-            <span className="absolute bottom-0 left-0 w-[100%] h-0.5 bg-white"></span>
+            {!isRegisterMode && (
+              <span className="absolute bottom-0 left-0 w-[100%] h-0.5 bg-white" />
+            )}
           </button>
           <button
-            onClick={handleCreateAccount}
-            className="w-1/2 pb-3 text-gray-500 hover:text-gray-300 transition-colors text-sm font-medium text-center"
+            type="button"
+            onClick={() => navigate('/register')}
+            className={`w-1/2 pb-3 text-sm font-medium relative text-center transition-colors ${
+              isRegisterMode ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+            }`}
           >
             Create Account
+            {isRegisterMode && (
+              <span className="absolute bottom-0 left-0 w-[100%] h-0.5 bg-white" />
+            )}
           </button>
         </div>
 
-        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email Field */}
+          {isRegisterMode && (
+            <Input
+              id="username"
+              type="text"
+              label="Username"
+              placeholder="Username"
+              value={formData.username}
+              onChange={(e) => onFieldChange('username', e.target.value)}
+              required
+            />
+          )}
+
           <Input
             id="email"
             type="email"
             label="Email Address"
             placeholder="Email Address"
             value={formData.email}
-            onChange={(e) => {
-              setFormData({ ...formData, email: e.target.value });
-              handleInputChange();
-            }}
+            onChange={(e) => onFieldChange('email', e.target.value)}
             required
           />
 
-          {/* Password Field */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label htmlFor="password" className="block text-xs font-medium text-gray-300">
                 Password
               </label>
-              <button
-                type="button"
-                onClick={handleForgotPassword}
-                className="text-[10px] font-semibold text-[#0ea5e9] hover:text-blue-400 tracking-wider uppercase"
-              >
-                FORGOT?
-              </button>
+              {!isRegisterMode && (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-[10px] font-semibold text-[#0ea5e9] hover:text-blue-400 tracking-wider uppercase"
+                >
+                  FORGOT?
+                </button>
+              )}
             </div>
             <Input
               id="password"
               type="password"
               placeholder="Password"
               value={formData.password}
-              onChange={(e) => {
-                setFormData({ ...formData, password: e.target.value });
-                handleInputChange();
-              }}
+              onChange={(e) => onFieldChange('password', e.target.value)}
               required
             />
           </div>
 
-          {/* Remember Me */}
-          <Checkbox
-            id="remember"
-            label="Remember this session"
-            checked={formData.remember}
-            onChange={(e) => setFormData({ ...formData, remember: e.target.checked })}
-          />
+          {isRegisterMode && (
+            <Input
+              id="confirmPassword"
+              type="password"
+              label="Confirm Password"
+              placeholder="Confirm Password"
+              value={formData.confirmPassword}
+              onChange={(e) => onFieldChange('confirmPassword', e.target.value)}
+              required
+            />
+          )}
 
-          {/* Error Message */}
-          {error && (
+          {!isRegisterMode && (
+            <Checkbox
+              id="remember"
+              label="Remember this session"
+              checked={formData.remember}
+              onChange={(e) => onFieldChange('remember', e.target.checked)}
+            />
+          )}
+
+          {displayError && (
             <div className="text-red-500 text-xs text-center bg-red-500/10 py-2 px-4 rounded">
-              {error}
+              {displayError}
             </div>
           )}
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            variant="primary"
-            className="w-full py-2.5"
-            disabled={loading}
-          >
-            {loading ? 'Signing in...' : 'Access Workspace'}
+          <Button type="submit" variant="primary" className="w-full py-2.5" disabled={loading}>
+            {loading
+              ? isRegisterMode
+                ? 'Creating account...'
+                : 'Signing in...'
+              : isRegisterMode
+                ? 'Create Account'
+                : 'Access Workspace'}
           </Button>
 
-          {/* Divider */}
           <div className="relative py-4 flex items-center">
-            <div className="flex-grow border-t border-[#333333]"></div>
+            <div className="flex-grow border-t border-[#333333]" />
             <span className="flex-shrink-0 mx-4 text-gray-500 text-[10px] font-semibold tracking-wider">
               OR
             </span>
-            <div className="flex-grow border-t border-[#333333]"></div>
+            <div className="flex-grow border-t border-[#333333]" />
           </div>
 
-          {/* Social Logins */}
           <div className="grid grid-cols-2 gap-4">
-            <SocialButton 
-              provider="github" 
-              onClick={() => handleSocialLogin('github')} 
-            />
-            <SocialButton 
-              provider="google" 
-              onClick={() => handleSocialLogin('google')} 
-            />
+            <SocialButton provider="github" onClick={() => handleSocialLogin('github')} />
+            <SocialButton provider="google" onClick={() => handleSocialLogin('google')} />
           </div>
         </form>
       </CardContent>
     </Card>
   );
 }
+

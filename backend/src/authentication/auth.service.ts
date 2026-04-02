@@ -20,11 +20,11 @@ export class AuthService {
     async validateUserLocal(email: string, password: string) {
         const credential = await this.userService.findByEmail(email);
         if (!credential) {
-            throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+            throw new HttpException('Invalid Email', HttpStatus.BAD_REQUEST);
         }
         const hashPasswordVerify = await bcrypt.compare(password, credential.passwordHash);
         if (!hashPasswordVerify) {
-            throw new HttpException('Invalid credentials', HttpStatus.UNAUTHORIZED);
+            throw new HttpException('Invalid Password', HttpStatus.BAD_REQUEST);
         }
 
         return credential;
@@ -143,17 +143,17 @@ export class AuthService {
             if (attempts > MAX_RETRIES) {
                 throw new HttpException('Failed to generate unique username', HttpStatus.INTERNAL_SERVER_ERROR);
             }
-        } while (await this.userService.findByUsername(username)); const randomPassword = randomBytes(32).toString('hex');
+        } while (await this.userService.findByUserName(username)); const randomPassword = randomBytes(32).toString('hex');
         const passwordHash = await bcrypt.hash(randomPassword, 10);
 
         const createdUser = await this.prisma.user.create({
             data: {
+                username: username,
                 name: googleUser.name,
                 avatarUrl: googleUser.profileUrl,
                 credentials: {
                     create: {
                         email: googleUser.email,
-                        username,
                         passwordHash,
                     },
                 },
@@ -215,7 +215,7 @@ export class AuthService {
         if (password !== confirmPassword) {
             throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
         }
-        const existingUser = await this.userService.findByEmail(email) || await this.userService.findByUsername(username);
+        const existingUser = await this.userService.findByEmail(email) || await this.userService.findByUserName(username);
         if (existingUser) {
             throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
         }

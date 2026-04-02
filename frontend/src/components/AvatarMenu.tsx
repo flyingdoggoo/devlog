@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
-import { selectCurrentUser } from '@features/auth/auth.slice';
+import { selectCurrentUser, selectIsAuthenticated } from '@features/auth/auth.slice';
 import { logoutThunk } from '@features/auth/auth.thunks';
 
 interface AvatarMenuProps {
@@ -12,6 +12,7 @@ export function AvatarMenu({ size = 'sm' }: AvatarMenuProps) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -41,7 +42,7 @@ export function AvatarMenu({ size = 'sm' }: AvatarMenuProps) {
   const onLogout = async () => {
     setOpen(false);
     await dispatch(logoutThunk());
-    navigate('/login');
+    navigate('/');
   };
 
   return (
@@ -68,30 +69,58 @@ export function AvatarMenu({ size = 'sm' }: AvatarMenuProps) {
 
       {open && (
         <div className="absolute right-0 top-12 w-44 bg-white border border-neutral-200 rounded-xl shadow-lg p-2 z-50">
-          <button
-            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
-            onClick={() => goTo('/home')}
-          >
-            Dashboard
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
-            onClick={() => goTo('/settings')}
-          >
-            Settings
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
-            onClick={() => goTo('/posts/create')}
-          >
-            Create Post
-          </button>
-          <button
-            className="w-full text-left px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
-            onClick={onLogout}
-          >
-            Log out
-          </button>
+          {isAuthenticated ? (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/home')}
+              >
+                Dashboard
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/settings')}
+              >
+                Settings
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/posts/create')}
+              >
+                Create Post
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/profile/me')}
+              >
+                View Profile
+              </button>
+              <div className="border-t border-neutral-200 my-2"></div>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                onClick={onLogout}
+              >
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/login')}
+              >
+                Sign In
+              </button>
+              <button
+                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-100 transition-colors"
+                onClick={() => goTo('/register')}
+              >
+                Create Account
+              </button>
+            </>
+          )}
+
+         
         </div>
       )}
     </div>

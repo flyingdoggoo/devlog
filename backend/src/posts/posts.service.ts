@@ -12,7 +12,7 @@ const postInclude = {
       }
     }
   },
-  author: { select: { id: true, name: true, avatarUrl: true } },
+  author: { select: { id: true, username: true, name: true, avatarUrl: true } },
   _count: {
     select:
     {
@@ -47,10 +47,11 @@ export class PostsService {
     });
   }
 
-  async findAllPosts(page = 1, limit = 10) {
+  async findAllPosts(page = 1, limit = 10, userId?: string) {
     const safePage = Math.max(page, 1);
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const skip = (safePage - 1) * safeLimit;
+    
     const [total, items] = await Promise.all([
       this.prisma.post.count({ where: { status: PostStatus.PUBLISHED } }),
       this.prisma.post.findMany({
@@ -60,7 +61,7 @@ export class PostsService {
         orderBy: { createdAt: 'desc' },
         include: {
           ...postInclude,
-          author: { select: { id: true, name: true, avatarUrl: true } },
+          author: { select: { id: true, username: true, name: true, avatarUrl: true } },
           comments: {
             where: {
               active: true,
@@ -73,19 +74,35 @@ export class PostsService {
               id: true,
               content: true,
               createdAt: true,
-              author: { select: { id: true, name: true, avatarUrl: true } },
+              author: { select: { id: true, username: true, name: true, avatarUrl: true } },
             },
           },
+          likes: userId ? {
+            where: {
+              active: true,
+              userId: userId
+            },
+            take : 1,
+          } : false
         },
       })
     ]);
+
+    const formattedItems = items.map((post) => {
+      const { likes, ...postData } = post;
+      return {
+        ...postData,
+        isLikedByMe: Array.isArray(likes) && likes.length > 0
+      };
+    });
+
     return {
-      items,
+      items: formattedItems,
       total,
       page: safePage,
       limit: safeLimit,
       hasMore: skip + items.length < total
-    };
+    };    
   }
 
   async findPostById(id: string) {

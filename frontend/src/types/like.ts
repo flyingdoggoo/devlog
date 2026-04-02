@@ -1,11 +1,9 @@
-// Rename to avoid conflict - like.ts already exists in types
-export interface LikeEntity {
+export interface Like {
   id: string;
   postId: string;
   userId: string;
   active: boolean;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface LikeUser {
@@ -20,3 +18,4 @@ export interface LikeWithUser {
   active: boolean;
   user?: LikeUser;
 }
+
