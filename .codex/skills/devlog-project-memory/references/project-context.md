@@ -15,14 +15,18 @@
 - Global styles: `frontend/src/index.css`
 - API client: `frontend/src/services/api.ts`
 
-### Current authenticated routes
+### Current routing split (guest-first)
 
-- `/` and `/home` -> dashboard feed
-- `/posts/create` -> create post page
-- `/posts/:id` -> post detail page
-- `/profile/me` -> personal profile page
-- `/profile/:userId` -> Other user profile page
-- `/settings` -> settings placeholder page
+- Public routes:
+  - `/` and `/home` -> dashboard feed
+  - `/search` -> unified search page
+  - `/posts/:id` -> post detail page
+  - `/login`, `/register` -> auth page (mode by pathname)
+- Auth-required routes:
+  - `/posts/create` -> create post page
+  - `/profile/me` -> personal profile page
+  - `/profile/:username` -> profile page (still behind auth)
+  - `/settings` -> settings placeholder page
 
 ### Important pages
 
@@ -48,12 +52,20 @@
 - Thunks: `frontend/src/features/auth/auth.thunks.ts`
 - Service: `frontend/src/services/auth.service.ts`
 - Contract note: backend success responses use `{ ok, data }`; frontend unwraps `data`.
+- Login/register redirect behavior:
+  - `AuthGuard` now preserves `from` in router state when redirecting to `/login`.
+  - Login/register success redirects back to `from` (fallback `/`).
+  - `register` thunk performs register then login to establish session cookies.
 
 ### FE style language
 
 - Primary visual style: monochrome neutral, high contrast headings, clean cards.
 - Fonts used: Space Grotesk (headlines), Inter (body), Material Symbols icon font.
 - Existing design favors soft borders, rounded-xl cards, subtle neutral hover states.
+- New interaction layer (Apr 2026): colorful micro-interactions via shared classes in `frontend/src/index.css` (`route-transition`, `interactive-card`, `tap-feedback`, `like-button`, `icon-badge*`).
+- Key pages (`HomePage`, `SearchPage`, `PostDetailPage`) now use mixed Lucide icons + accent hover/click states for clearer affordances.
+- `ProfilePage` is now synced with the same interaction language and Lucide accent icons; `Create Post` buttons follow border-blue/white style.
+- Logout UX: Avatar menu now redirects to home (`/`) after logout instead of `/login`.
 
 ## 3) Backend Snapshot
 

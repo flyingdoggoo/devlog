@@ -5,6 +5,24 @@ import { selectCurrentUser } from '@features/auth/auth.slice';
 import { AvatarMenu } from '@components/AvatarMenu';
 import { usersApi, type UserProfile } from '@services/users.service';
 import axios from 'axios';
+import {
+  BarChart3,
+  Bell,
+  Bookmark,
+  CalendarDays,
+  Compass,
+  Heart,
+  Home,
+  Mail,
+  MessageCircle,
+  Plus,
+  Search,
+  Settings,
+  Share2,
+  TrendingUp,
+  User,
+  Users,
+} from 'lucide-react';
 
 const intensityClasses = ['bg-[#ececec]', 'bg-[#d7d7d7]', 'bg-[#a9a9a9]', 'bg-black'];
 const HEATMAP_CELLS = 52 * 7;
@@ -149,19 +167,19 @@ export function ProfilePage() {
       <nav className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/60 z-50">
         <div className="flex items-center gap-8">
           <button
-            className="text-2xl font-bold font-['Space_Grotesk'] text-black"
+            className="text-2xl font-bold font-['Space_Grotesk'] text-black tap-feedback"
             onClick={() => navigate('/home')}
           >
             DevLog
           </button>
           <div className="hidden md:flex items-center gap-6">
             <button
-              className="text-neutral-500 font-medium hover:bg-neutral-100 transition-colors duration-150 px-3 py-1 rounded"
+              className="text-neutral-500 font-medium hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 px-3 py-1 rounded tap-feedback"
               onClick={() => navigate('/home')}
             >
               Home
             </button>
-            <button className="text-neutral-500 font-medium hover:bg-neutral-100 transition-colors duration-150 px-3 py-1 rounded">
+            <button className="text-neutral-500 font-medium hover:bg-emerald-50 hover:text-emerald-700 transition-colors duration-150 px-3 py-1 rounded tap-feedback">
               Explore
             </button>
             <button className="text-black font-bold border-b-2 border-black px-3 py-1">
@@ -172,17 +190,15 @@ export function ProfilePage() {
 
         <div className="flex items-center gap-4">
           <div className="relative hidden sm:block">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">
-              search
-            </span>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-sky-600" />
             <input
-              className="bg-[#f1f1f1] border-none focus:ring-0 rounded-full pl-10 pr-4 py-1.5 text-sm w-44 transition-all focus:w-60"
+              className="bg-[#f1f1f1] border border-transparent focus:ring-2 focus:ring-sky-200 hover:border-sky-200 rounded-full pl-10 pr-4 py-1.5 text-sm w-56 transition-all"
               placeholder="Search logs..."
               type="text"
             />
           </div>
-          <button className="material-symbols-outlined p-2 rounded-full hover:bg-neutral-100 transition-all">
-            notifications
+          <button className="p-2.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all tap-feedback">
+            <Bell className="h-4 w-4" />
           </button>
 
           <AvatarMenu size="sm" />
@@ -195,35 +211,35 @@ export function ProfilePage() {
           <p className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Developer Logs</p>
         </div>
         <button
-          className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg"
+          className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card"
           onClick={() => navigate('/home')}
         >
-          <span className="material-symbols-outlined">home</span>
+          <Home className="h-4 w-4 text-sky-600" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Home</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-          <span className="material-symbols-outlined">explore</span>
+        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+          <Compass className="h-4 w-4 text-emerald-600" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Explore</span>
         </button>
         <button className="text-black bg-[#e2e2e2] px-4 py-2 flex items-center gap-3 rounded-lg">
-          <span className="material-symbols-outlined">person</span>
+          <User className="h-4 w-4 text-violet-600" />
           <span className="font-['Inter'] text-sm font-semibold tracking-wide">Profile</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-          <span className="material-symbols-outlined">bookmark</span>
+        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+          <Bookmark className="h-4 w-4 text-blue-700" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Bookmarks</span>
         </button>
 
         <div className="mt-auto border-t border-neutral-200/40 pt-4">
           <button
-            className="w-full bg-black text-white py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity mb-4"
+            className="w-full bg-white border border-blue-300 text-blue-700 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 hover:bg-blue-50 transition-all mb-4 tap-feedback"
             onClick={() => navigate('/posts/create')}
           >
-            <span className="material-symbols-outlined text-sm">add</span>
-            New Entry
+            <Plus className="h-4 w-4" />
+            Create Post
           </button>
-          <button className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg">
-            <span className="material-symbols-outlined">settings</span>
+          <button className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+            <Settings className="h-4 w-4 text-amber-600" />
             <span className="font-['Inter'] text-sm font-medium tracking-wide">Settings</span>
           </button>
         </div>
@@ -271,12 +287,12 @@ export function ProfilePage() {
 
               <div className="flex flex-wrap gap-4 text-sm font-medium">
                 <span className="flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-sm">calendar_today</span>
+                  <CalendarDays className="h-4 w-4 text-sky-600" />
                   Joined {formatJoinedDate(profile.createdAt)}
                 </span>
                 {isOwnProfile && profile.credentials?.[0]?.email && (
                   <span className="flex items-center gap-1.5 text-neutral-600">
-                    <span className="material-symbols-outlined text-sm">mail</span>
+                    <Mail className="h-4 w-4 text-emerald-600" />
                     {profile.credentials[0].email}
                   </span>
                 )}
@@ -329,7 +345,7 @@ export function ProfilePage() {
               {profile.posts.map((item) => (
                 <div
                   key={item.id}
-                  className="group p-6 bg-white rounded-xl border border-transparent hover:border-neutral-300/60 transition-all"
+                  className="group p-6 bg-white rounded-xl border border-transparent hover:border-neutral-300/60 transition-all interactive-card"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex gap-2">
@@ -356,13 +372,13 @@ export function ProfilePage() {
                   <p className="mt-2 text-neutral-600 line-clamp-2 leading-relaxed">{item.content}</p>
                   <div className="mt-4 flex items-center gap-6 text-xs font-medium text-neutral-500">
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">favorite</span> {item._count.likes}
+                      <Heart className="h-4 w-4 text-rose-500" /> {item._count.likes}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">chat_bubble</span> {item._count.comments}
+                      <MessageCircle className="h-4 w-4 text-blue-600" /> {item._count.comments}
                     </span>
                     <span className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">share</span>
+                      <Share2 className="h-4 w-4 text-emerald-600" />
                     </span>
                   </div>
                 </div>
@@ -390,21 +406,21 @@ export function ProfilePage() {
             </h3>
             <div className="space-y-4">
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">trending_up</span>
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
                 <div>
                   <p className="text-xs font-semibold text-black">Published Posts</p>
                   <p className="text-[10px] text-neutral-500">{profile._count.posts} published entries</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">group</span>
+                <Users className="h-4 w-4 text-blue-600" />
                 <div>
                   <p className="text-xs font-semibold text-black">Network</p>
                   <p className="text-[10px] text-neutral-500">{profile._count.followers} followers • {profile._count.following} following</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 group opacity-90 hover:opacity-100 transition-all cursor-pointer">
-                <span className="material-symbols-outlined text-neutral-400">insights</span>
+                <BarChart3 className="h-4 w-4 text-violet-600" />
                 <div>
                   <p className="text-xs font-semibold text-black">Comments</p>
                   <p className="text-[10px] text-neutral-500">{profile._count.comments} comments in total</p>

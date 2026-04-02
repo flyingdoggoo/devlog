@@ -2,8 +2,10 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req, Quer
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { ApiOperation } from '@nestjs/swagger/dist/decorators/api-operation.decorator';
+import { ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@authentication/guard/jwt.guard';
+import { OptionalJwtAuthGuard } from '@authentication/guard/optional-jwt.guard';
+
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
@@ -18,8 +20,10 @@ export class PostsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all posts' })
-  findAllPosts(@Query('page') page = '1', @Query('limit') limit = '10') {
-    return this.postsService.findAllPosts(Number(page), Number(limit));
+  @UseGuards(OptionalJwtAuthGuard)
+  findAllPosts(@Query('page') page = '1', @Query('limit') limit = '10', @Req() req?) {
+    const userId = req?.user?.userId;
+    return this.postsService.findAllPosts(Number(page), Number(limit), userId);
   }
 
   @Get(':id')

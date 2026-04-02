@@ -1,7 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { authApi } from '@services/auth.service';
 import { loginStart, loginSuccess, loginFailure, markAuthInitialized, logout } from './auth.slice';
-import type { LoginDto } from '@services/auth.service';
+import type { LoginDto, RegisterDto } from '@services/auth.service';
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -37,6 +37,39 @@ export const loginWithGoogle = createAsyncThunk(
     // Triggers redirect - state will be restored via checkAuth on return
     authApi.loginWithGoogle();
   }
+);
+
+export const register = createAsyncThunk(
+  'auth/register',
+  async (payload: RegisterDto, { dispatch, rejectWithValue }) => {
+    try {
+      dispatch(loginStart());
+
+      await authApi.register(payload);
+
+      // Register endpoint only creates account, then login to create session cookies.
+      await authApi.login({
+        email: payload.email,
+        password: payload.password,
+        remember: true,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const user = await authApi.getCurrentUser();
+      dispatch(loginSuccess(user));
+
+      return user;
+    } catch (error: any) {
+      console.error('Register error:', error);
+      const message = error.response?.data?.message;
+      const errorMessage = Array.isArray(message)
+        ? message.join(', ')
+        : message || error.message || 'Register failed';
+
+      dispatch(loginFailure(errorMessage));
+      return rejectWithValue(errorMessage);
+    }
+  },
 );
 
 export const logoutThunk = createAsyncThunk(

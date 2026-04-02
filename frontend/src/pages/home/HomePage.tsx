@@ -1,6 +1,7 @@
 import { postsApi } from '@/services/posts.service';
 import { tagsApi } from '@/services/tags.service';
 import { usersApi } from '@/services/users.service';
+import { likesApi } from '@/services/likes.service';
 import { Post } from '@/types/post';
 import { Tag } from '@/types/tag';
 import { User } from '@/types/user';
@@ -8,7 +9,25 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AvatarMenu } from '@/components/AvatarMenu';
 import { useAppSelector } from '@/app/hooks';
-import { selectCurrentUser } from '@/features/auth/auth.slice';
+import { selectCurrentUser, selectIsAuthenticated } from '@/features/auth/auth.slice';
+import { useRequireAuthAction } from '@hooks/useRequireAuthAction';
+import {
+  BarChart3,
+  Bell,
+  Bookmark,
+  Compass,
+  Flame,
+  Heart,
+  HelpCircle,
+  Home,
+  MessageCircle,
+  Plus,
+  Search,
+  Settings,
+  Tag as TagIcon,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
@@ -54,6 +73,7 @@ function buildLast7DaysHeights(posts: Post[]) {
 
 export function HomePage() {
   const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [posts, setPosts] = useState<Post[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [suggestedUsers, setSuggestedUsers] = useState<User[]>([]);
@@ -61,10 +81,71 @@ export function HomePage() {
   const [loading, setLoading] = useState(false);
   const [sidebarLoading, setSidebarLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
   const loadingRef = useRef(false);
   const hasMoreRef = useRef(true);
   const pageRef = useRef(1);
   const navigate = useNavigate();
+  const { requireAuthAction } = useRequireAuthAction();
+  const [pendingLikePostIds, setPendingLikePostIds] = useState<Set<string>>(new Set());
+  const handleLikePost = async (event: React.MouseEvent, postId: string) => {
+    event.stopPropagation();
+
+    if (!requireAuthAction()) return;
+    if (!currentUser?.id) return;
+    if (pendingLikePostIds.has(postId)) return;
+
+    const targetPost = posts.find((p) => p.id === postId);
+    if (!targetPost) return;
+
+    const isLiked = targetPost.isLikedByMe;
+
+    setPendingLikePostIds((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(postId);
+      return newSet;
+    });
+
+    try {
+      if (isLiked) {
+        await likesApi.unlikePost(postId);
+      } else {
+        await likesApi.likePost(postId);
+      }
+      setPosts((prev) =>
+        prev.map((post) => {
+          if (post.id === postId) {
+            const likeCount = post._count?.likes ?? 0;
+            const nextCount = isLiked ? Math.max(0, likeCount - 1) : likeCount + 1;
+            return {
+              ...post,
+              isLikedByMe: !isLiked,
+              _count: {
+                ...post._count,
+                likes: nextCount,
+                comments: post._count?.comments ?? 0,
+              }
+            };
+          }
+          return post;
+        })
+      );
+    } catch (error) {
+      console.error('Failed to update like status:', error);
+    } finally {
+      setPendingLikePostIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(postId);
+        return newSet;
+      });
+    }
+  }
+
+  const handleSearchSubmit = () => {
+    const q = searchKeyword.trim();
+    if (q.length < 2) return;
+    navigate(`/search?q=${encodeURIComponent(q)}&type=posts&page=1`);
+  }
 
   const loadPosts = useCallback(async (nextPage: number) => {
     if (loadingRef.current || !hasMoreRef.current) return;
@@ -157,20 +238,54 @@ export function HomePage() {
       <header className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/50 z-50">
         <div className="flex items-center gap-8">
           <span className="text-2xl font-bold font-['Space_Grotesk'] text-black">DevLog</span>
-          <div className="relative hidden md:block">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">search</span>
+          <form
+            className="relative hidden md:block"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearchSubmit();
+            }}
+          >
+            <button
+              type="submit"
+              className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 icon-badge icon-badge-search"
+              aria-label="Search"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
             <input
-              className="bg-surface-container-low border-none focus:ring-1 focus:ring-primary rounded-lg pl-10 pr-4 py-1.5 text-sm w-64 transition-all"
+              className="bg-surface-container-low border border-transparent hover:border-sky-200 focus:ring-2 focus:ring-sky-200 rounded-lg pl-10 pr-4 py-1.5 text-sm w-64 transition-all"
               placeholder="Search entries..."
               type="text"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
             />
-          </div>
+          </form>
         </div>
         <div className="flex items-center gap-4">
-          <button className="p-2 rounded-full hover:bg-neutral-100 transition-colors">
-            <span className="material-symbols-outlined text-neutral-600">notifications</span>
-          </button>
-          <AvatarMenu size="sm" />
+          {isAuthenticated ? (
+            <>
+              <button className="p-2.5 icon-badge icon-badge-bell">
+                <Bell className="h-4 w-4" />
+              </button>
+              <AvatarMenu size="sm" />
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 text-neutral-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all tap-feedback"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-all tap-feedback"
+              >
+                Create Account
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -183,42 +298,42 @@ export function HomePage() {
           </div>
 
           <nav className="flex-1 space-y-1">
-            <a className="bg-[#e2e2e2] text-black rounded-lg px-4 py-2 flex items-center gap-3 transition-transform translate-x-1" href="#">
-              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>home</span>
+            <a className="bg-[#e2e2e2] text-black rounded-lg px-4 py-2 flex items-center gap-3 transition-transform translate-x-1 interactive-card" href="#">
+              <Home className="h-4 w-4 text-sky-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Home</span>
             </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
-              <span className="material-symbols-outlined">explore</span>
+            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+              <Compass className="h-4 w-4 text-emerald-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Explore</span>
             </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
-              <span className="material-symbols-outlined">sell</span>
+            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+              <TagIcon className="h-4 w-4 text-orange-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Tags</span>
             </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
-              <span className="material-symbols-outlined">bookmark</span>
+            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+              <Bookmark className="h-4 w-4 text-blue-700" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Bookmarks</span>
             </a>
           </nav>
 
           <button
-            onClick={() => navigate('/posts/create')}
-            className="bg-gradient-to-br from-black to-neutral-700 text-white rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 mb-4"
+            onClick={() => requireAuthAction(() => navigate('/posts/create'))}
+            className="bg-white border border-blue-300 text-blue-700 rounded-lg py-3 px-4 flex items-center justify-center gap-2 font-medium text-sm transition-all active:scale-95 hover:bg-blue-50 mb-4 tap-feedback"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <Plus className="h-4 w-4" />
             New Post
           </button>
 
           <div className="border-t border-neutral-200/50 pt-4 space-y-1">
             <button
-              className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg"
-              onClick={() => navigate('/settings')}
+              className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card"
+              onClick={() => requireAuthAction(() => navigate('/settings'))}
             >
-              <span className="material-symbols-outlined text-lg">settings</span>
+              <Settings className="h-4 w-4 text-amber-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Settings</span>
             </button>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg" href="#">
-              <span className="material-symbols-outlined text-lg">help_outline</span>
+            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+              <HelpCircle className="h-4 w-4 text-violet-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Help</span>
             </a>
           </div>
@@ -259,10 +374,10 @@ export function HomePage() {
               const readTime = `${Math.max(1, Math.ceil(words / 200))}m read`;
 
               return (
-                <article key={post.id} className="group cursor-pointer" onClick={() => navigate(`/posts/${post.id}`)}>
-                  <div className="bg-white p-8 rounded-xl transition-all duration-300 hover:bg-white border-transparent border hover:border-neutral-200/50">
+                <article key={post.id} className="group">
+                  <div className="bg-white p-8 rounded-xl transition-all duration-300 hover:bg-white border-transparent border hover:border-neutral-200/50 interactive-card">
                     {/* 1) User header */}
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-3 mb-4 cursor-pointer" onClick={() => navigate(`/profile/${post.author?.username}`)}>
                       {post.author?.avatarUrl ? (
                         <img
                           src={post.author.avatarUrl}
@@ -284,7 +399,7 @@ export function HomePage() {
 
                     {/* Title + tag */}
                     <div className="flex justify-between items-start mb-4">
-                      <h2 className="text-2xl font-bold group-hover:underline underline-offset-4 decoration-1">
+                      <h2 className="text-2xl font-bold hover:underline underline-offset-4 decoration-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => navigate(`/posts/${post.id}`)}>
                         {post.title}
                       </h2>
                       <span className="text-xs font-mono bg-neutral-200 px-2 py-1 rounded text-neutral-700">
@@ -298,12 +413,18 @@ export function HomePage() {
 
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-xs font-medium text-neutral-400">
-                      <div className="flex items-center gap-1.5 hover:text-black transition-colors">
-                        <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                      <div
+                        className={`flex items-center gap-1.5 transition-colors cursor-pointer like-button
+                                  ${post.isLikedByMe ? 'is-liked' : 'text-neutral-400'} 
+                                  ${pendingLikePostIds.has(post.id) ? 'opacity-50 cursor-not-allowed' : ''}
+                                `}
+                        onClick={(event) => handleLikePost(event, post.id)}
+                      >
+                        <Heart className={`h-[18px] w-[18px] like-icon ${post.isLikedByMe ? 'fill-current' : ''}`} />
                         {post._count?.likes ?? 0}
                       </div>
-                      <div className="flex items-center gap-1.5 hover:text-black transition-colors">
-                        <span className="material-symbols-outlined text-lg">chat_bubble</span>
+                      <div className="flex items-center gap-1.5 hover:text-blue-700 transition-colors cursor-pointer tap-feedback" onClick={() => navigate(`/posts/${post.id}`)}>
+                        <MessageCircle className="h-[18px] w-[18px]" />
                         {post._count?.comments ?? 0}
                       </div>
                       <span className="ml-auto">{readTime}</span>
@@ -321,7 +442,8 @@ export function HomePage() {
                         post.comments.map((c) => (
                           <div
                             key={c.id}
-                            className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors"
+                            className="flex items-start gap-3 rounded-xl px-3 py-2 hover:bg-neutral-50 transition-colors cursor-pointer"
+                            onClick={() => navigate(`/profile/${c.author?.username}`)}
                           >
                             {c.author?.avatarUrl ? (
                               <img
@@ -394,7 +516,7 @@ export function HomePage() {
           <div className="bg-white p-6 rounded-xl mb-8 shadow-sm border border-neutral-100">
             <div className="flex justify-between items-center mb-4">
               <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Daily Streak</span>
-              <span className="material-symbols-outlined text-orange-500" style={{ fontVariationSettings: "'FILL' 1" }}>local_fire_department</span>
+              <Flame className="h-4 w-4 text-orange-500" />
             </div>
             <div className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{postStreak} Days</div>
             <div className="flex gap-1.5">
@@ -411,7 +533,7 @@ export function HomePage() {
           {/* Trending Tags */}
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-lg">trending_up</span>
+              <TrendingUp className="h-4 w-4 text-emerald-600" />
               <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Trending Tags</h3>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -435,7 +557,7 @@ export function HomePage() {
           {/* Suggested Users */}
           <div className="mb-10">
             <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-lg">group</span>
+              <Users className="h-4 w-4 text-blue-600" />
               <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Suggested Users</h3>
             </div>
             <div className="space-y-4">
@@ -449,7 +571,12 @@ export function HomePage() {
                 </div>
               ))}
               {!sidebarLoading && suggestedUsers.map((user) => (
-                <div key={user.id} className="flex items-center gap-3 group cursor-pointer">
+                <div key={user.id} className="flex items-center gap-3 group cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/profile/${user.username}`)
+                  }}
+                >
                   {user.avatarUrl ? (
                     <img className="w-8 h-8 rounded-full object-cover" src={user.avatarUrl} alt={user.name ?? user.username} />
                   ) : (
@@ -462,7 +589,7 @@ export function HomePage() {
                     <p className="text-[10px] text-neutral-400">@{user.username}</p>
                   </div>
                   <button
-                    className="text-[10px] font-bold border border-neutral-200 px-2 py-1 rounded hover:bg-black hover:text-white transition-all"
+                    className="text-[10px] font-bold border border-neutral-200 px-2 py-1 rounded hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all tap-feedback"
                     onClick={() => navigate(`/profile/${user.username}`)}
                   >
                     VIEW
@@ -478,7 +605,7 @@ export function HomePage() {
           {/* Activity Stats */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-lg">insights</span>
+              <BarChart3 className="h-4 w-4 text-violet-600" />
               <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Activity Stats</h3>
             </div>
             <div className="p-4 bg-neutral-100 rounded-lg">

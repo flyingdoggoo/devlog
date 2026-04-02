@@ -20,6 +20,7 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   author?: User;
+  isLikedByMe? : boolean;
   comments?: {
     id: string;
     content: string;
@@ -27,6 +28,7 @@ export interface Post {
     author?: {
       id: string;
       name: string | null;
+      username: string;
       avatarUrl?: string | null;
     };
   }[];

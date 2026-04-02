@@ -23,18 +23,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       // Proxy TẤT CẢ requests đến backend
-      '/auth': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/users': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/posts': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,

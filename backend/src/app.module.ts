@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
-import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '@prisma/prisma.module';
 import { AuthModule } from '@authentication/auth.module';
 import { PostsModule } from './posts/posts.module';
@@ -11,17 +11,23 @@ import { TagsModule } from './tags/tags.module';
 import { LikesModule } from './likes/likes.module';
 import { CommentsModule } from './comments/comments.module';
 import { FollowsModule } from './follows/follows.module';
+import { RedisCacheModule } from './cache/redis-cache.module';
+import { SearchModule } from './search/search.module';
+
 @Module({
-  imports: [UsersModule, PrismaModule, AuthModule,
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    RedisCacheModule,
+    UsersModule,
+    AuthModule,
     PostsModule,
     NotificationModule,
     TagsModule,
     LikesModule,
     CommentsModule,
-    FollowsModule
+    FollowsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [AppService],
