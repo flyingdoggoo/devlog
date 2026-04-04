@@ -17,6 +17,24 @@ export class AuthService {
         private configService: ConfigService,
         private prisma: PrismaService,
     ) { }
+
+    private resolveCookiePolicy() {
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? '';
+        const isHttpsFrontend = frontendUrl.trim().toLowerCase().startsWith('https://');
+
+        // Cross-origin cookie sessions on HTTPS require SameSite=None + Secure.
+        if (isHttpsFrontend) {
+            return {
+                sameSite: 'None' as const,
+                secureFlag: '; Secure',
+            };
+        }
+
+        return {
+            sameSite: 'Lax' as const,
+            secureFlag: '',
+        };
+    }
     async validateUserLocal(email: string, password: string) {
         const normalizedEmail = email.trim().toLowerCase();
         const credential = await this.userService.findByEmail(normalizedEmail);
@@ -52,9 +70,7 @@ export class AuthService {
         const accessTokenTTL = Number(this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900;
         const refreshTokenTTL = Number(this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')) || 604800;
         const accessToken = this.jwtService.sign({ userId } as Payload);
-        const isProduction = this.configService.get('NODE_ENV') === 'production';
-        const sameSite = isProduction ? 'None' : 'Lax';
-        const secureFlag = isProduction ? '; Secure' : '';
+        const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const refreshToken = randomBytes(64).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
@@ -200,9 +216,7 @@ export class AuthService {
             });
         }
 
-        const isProduction = this.configService.get('NODE_ENV') === 'production';
-        const sameSite = isProduction ? 'None' : 'Lax';
-        const secureFlag = isProduction ? '; Secure' : '';
+        const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const authCookie = `Authentication=; HttpOnly; Path=/; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
         const refreshCookie = `RefreshToken=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;

@@ -27,6 +27,19 @@ async function getCurrentUserWithRetry(maxAttempts = 5): Promise<Awaited<ReturnT
   throw lastError;
 }
 
+function normalizeAuthError(error: any): string {
+  const status = error?.response?.status;
+  const message = error?.response?.data?.message ?? error?.message;
+
+  if (status === 401) {
+    return 'Session was not established. Please check frontend/backend URL config and try again.';
+  }
+
+  if (Array.isArray(message)) return message.join(', ');
+  if (typeof message === 'string') return message;
+  return 'Authentication failed';
+}
+
 export const login = createAsyncThunk(
   'auth/login',
   async (credentials: LoginDto, { dispatch, rejectWithValue }) => {
@@ -45,7 +58,7 @@ export const login = createAsyncThunk(
       return user;
     } catch (error: any) {
       console.error('Login error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      const errorMessage = normalizeAuthError(error);
       dispatch(loginFailure(errorMessage));
       return rejectWithValue(errorMessage);
     }
@@ -81,10 +94,7 @@ export const register = createAsyncThunk(
       return user;
     } catch (error: any) {
       console.error('Register error:', error);
-      const message = error.response?.data?.message;
-      const errorMessage = Array.isArray(message)
-        ? message.join(', ')
-        : message || error.message || 'Register failed';
+      const errorMessage = normalizeAuthError(error);
 
       dispatch(loginFailure(errorMessage));
       return rejectWithValue(errorMessage);
