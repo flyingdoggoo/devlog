@@ -117,6 +117,10 @@
 - Frontend build may fail on Vite in restricted environments (`spawn EPERM`), but `npx tsc -b` is used for reliable type checks.
 - Backend build command: `npm run build` (inside `backend`).
 - Frontend typecheck command: `npx tsc -b` (inside `frontend`).
+- Render deployment baseline now exists:
+  - Root `render.yaml` provisions API web service, static frontend, Postgres, and Key Value.
+  - Frontend API client supports `VITE_API_BASE_URL` for cross-domain production calls while retaining local `/api` proxy fallback.
+  - Deploy notes live in `docs/deploy-render.md`.
 
 ## 7) Keep This Memory Fresh
 

@@ -14,8 +14,12 @@ export const authApi = {
   },
 
   loginWithGoogle: async (): Promise<void> => {
-    // Redirect đến backend Google OAuth
-    window.location.href = '/auth/google';
+    // Redirect to backend Google OAuth endpoint.
+    // Works for both:
+    // - local dev: baseURL = /api  -> /api/auth/google (Vite proxy)
+    // - production: baseURL = https://api.../api -> https://api.../api/auth/google
+    const base = (apiClient.defaults.baseURL ?? '/api').replace(/\/+$/, '');
+    window.location.href = `${base}/auth/google`;
   },
 
   logout: async (): Promise<void> => {

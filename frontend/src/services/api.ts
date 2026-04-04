@@ -1,6 +1,16 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+
+// Production: set VITE_API_BASE_URL (e.g. https://devlog-api.onrender.com)
+// Local dev: keep empty to use Vite proxy '/api' -> localhost backend.
+const rawApiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+
+// Normalize to avoid double prefix:
+// - https://api.onrender.com     -> https://api.onrender.com/api
+// - https://api.onrender.com/api -> https://api.onrender.com/api
+const normalizedBase = rawApiBase.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
+
 export const apiClient = axios.create({
-  baseURL: '/api', 
+  baseURL: normalizedBase ? `${normalizedBase}/api` : '/api',
   headers: {
     'Content-Type': 'application/json',
   },
