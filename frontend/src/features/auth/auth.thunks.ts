@@ -3,6 +3,30 @@ import { authApi } from '@services/auth.service';
 import { loginStart, loginSuccess, loginFailure, markAuthInitialized, logout } from './auth.slice';
 import type { LoginDto, RegisterDto } from '@services/auth.service';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function getCurrentUserWithRetry(maxAttempts = 5): Promise<Awaited<ReturnType<typeof authApi.getCurrentUser>>> {
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await authApi.getCurrentUser();
+    } catch (error: any) {
+      lastError = error;
+      const status = error?.response?.status;
+
+      // Only retry on unauthorized because cookie/session might not be visible instantly.
+      if (status !== 401 || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await sleep(120 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
 export const login = createAsyncThunk(
   'auth/login',
   async (credentials: LoginDto, { dispatch, rejectWithValue }) => {
@@ -11,12 +35,9 @@ export const login = createAsyncThunk(
       
       // Bước 1: Gọi API login (set cookie)
       await authApi.login(credentials);
-      
-      // Bước 2: Đợi một chút để cookie được set
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Bước 3: Gọi API lấy user info (với cookie đã set)
-      const user = await authApi.getCurrentUser();
+
+      // Bước 2: Retry lấy user info để tránh race condition cookie propagation.
+      const user = await getCurrentUserWithRetry();
       
       // Bước 4: Update Redux state
       dispatch(loginSuccess(user));
@@ -54,8 +75,7 @@ export const register = createAsyncThunk(
         remember: true,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      const user = await authApi.getCurrentUser();
+      const user = await getCurrentUserWithRetry();
       dispatch(loginSuccess(user));
 
       return user;

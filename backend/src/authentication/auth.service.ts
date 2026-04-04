@@ -18,7 +18,8 @@ export class AuthService {
         private prisma: PrismaService,
     ) { }
     async validateUserLocal(email: string, password: string) {
-        const credential = await this.userService.findByEmail(email);
+        const normalizedEmail = email.trim().toLowerCase();
+        const credential = await this.userService.findByEmail(normalizedEmail);
         if (!credential) {
             throw new HttpException('Invalid Email', HttpStatus.BAD_REQUEST);
         }
@@ -211,7 +212,9 @@ export class AuthService {
     }
 
     async register(registerDto: RegisterDto) {
-        const { email, password, confirmPassword, username } = registerDto;
+        const email = registerDto.email.trim().toLowerCase();
+        const username = registerDto.username.trim().toLowerCase();
+        const { password, confirmPassword } = registerDto;
         if (password !== confirmPassword) {
             throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
         }
@@ -219,6 +222,10 @@ export class AuthService {
         if (existingUser) {
             throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
         }
-        return this.userService.createUser(registerDto);
+        return this.userService.createUser({
+            ...registerDto,
+            email,
+            username,
+        });
     }
 }

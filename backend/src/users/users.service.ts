@@ -97,9 +97,10 @@ export class UsersService {
   }
 
   async findByEmail(email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     const credential = await this.prisma.credential.findUnique({
       where: {
-        email
+        email: normalizedEmail
       }
     });
     return credential;
@@ -116,13 +117,14 @@ export class UsersService {
   async createUser(createUserDto: CreateUserDto) {
     const { email, password, username } = createUserDto;
     const normalizedUsername = username.trim().toLowerCase();
+    const normalizedEmail = email.trim().toLowerCase();
     const user = await this.prisma.user.create({
       data: {
         name: username,
         username: normalizedUsername,
         credentials: {
           create: {
-            email,
+            email: normalizedEmail,
             passwordHash: await bcrypt.hash(password, 10)
           }
         }
