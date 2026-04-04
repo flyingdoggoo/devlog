@@ -13,6 +13,9 @@ Tai lieu nay di kem voi `render.yaml` trong root repo.
    - `devlog-db` (PostgreSQL)
    - `devlog-cache` (Key Value / Redis-compatible)
 
+Mac dinh file `render.yaml` dang set `devlog-api` va `devlog-db` o `plan: free`.
+Neu workspace/region cua ban khong con free slot, Render se bao gia plan tra phi.
+
 ## 2) Dien env bat buoc sau khi sync
 
 Trong service `devlog-api`:
