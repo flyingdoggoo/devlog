@@ -37,7 +37,6 @@ services:
   - type: web
     name: devlog-web
     runtime: static
-    region: singapore
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
