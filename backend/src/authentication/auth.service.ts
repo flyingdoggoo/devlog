@@ -21,9 +21,10 @@ export class AuthService {
     private resolveCookiePolicy() {
         const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? '';
         const isHttpsFrontend = frontendUrl.trim().toLowerCase().startsWith('https://');
+        const isProduction = (this.configService.get<string>('NODE_ENV') ?? '').toLowerCase() === 'production';
 
-        // Cross-origin cookie sessions on HTTPS require SameSite=None + Secure.
-        if (isHttpsFrontend) {
+        // In production and/or HTTPS frontend, enforce cross-site safe cookie settings.
+        if (isProduction || isHttpsFrontend) {
             return {
                 sameSite: 'None' as const,
                 secureFlag: '; Secure',
@@ -92,8 +93,8 @@ export class AuthService {
         });
         const effectiveSessionId = session.id;
         const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
         return [authCookie, refreshCookie, sessionCookie];
     }
 
@@ -219,8 +220,8 @@ export class AuthService {
         const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const authCookie = `Authentication=; HttpOnly; Path=/; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
-        const refreshCookie = `RefreshToken=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
-        const sessionCookie = `SessionId=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
 
         return [authCookie, refreshCookie, sessionCookie];
     }
