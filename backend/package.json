@@ -21,7 +21,8 @@
     "seed:posts-tags": "ts-node scripts/seed-posts-tags.ts",
     "cleanup:seed": "ts-node scripts/cleanup-seed-posts-tags.ts",
     "seed:large": "ts-node scripts/seed-large-data.ts",
-    "cleanup:seed:large": "ts-node scripts/cleanup-seed-large-data.ts"
+    "cleanup:seed:large": "ts-node scripts/cleanup-seed-large-data.ts",
+    "seed:it-social": "ts-node scripts/seed-it-social.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

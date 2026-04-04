@@ -21,11 +21,11 @@
   - `/` and `/home` -> dashboard feed
   - `/search` -> unified search page
   - `/posts/:id` -> post detail page
+  - `/profile/:username` -> public profile page
   - `/login`, `/register` -> auth page (mode by pathname)
 - Auth-required routes:
   - `/posts/create` -> create post page
   - `/profile/me` -> personal profile page
-  - `/profile/:username` -> profile page (still behind auth)
   - `/settings` -> settings placeholder page
 
 ### Important pages
@@ -38,6 +38,7 @@
   - Reading progress + discussion section
 - Profile: `frontend/src/pages/profile/ProfilePage.tsx`
   - Template-style profile UI integrated into React
+  - Header now shows `Login` + `Register` for guests (no avatar/notification if unauthenticated)
 - Settings: `frontend/src/pages/settings/SettingsPage.tsx`
 
 ### Shared header user menu
@@ -85,6 +86,11 @@
 - `tags`
 - `likes`
 - `follows`
+- `search`
+
+### Public profile endpoint
+
+- `GET /api/users/username/:username` is public so guests can view other profiles.
 
 ### Auth/session behavior
 
@@ -122,6 +128,10 @@
   - Frontend API client supports `VITE_API_BASE_URL` for cross-domain production calls while retaining local `/api` proxy fallback.
   - Prisma datasource now uses `DATABASE_URL` + `DIRECT_URL` (`directUrl`) to support Neon pooled runtime connections plus direct migration connections.
   - Deploy notes live in `docs/deploy-render.md`.
+- Social mock seed:
+  - Command: `npm run seed:it-social -- --users=40` (range 20-50 users).
+  - Guide: `docs/seed-neon-it-social.md`.
+  - Snapshot output: `backend/scripts/output/seed-it-social.json`.
 
 ## 7) Keep This Memory Fresh
 

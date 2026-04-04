@@ -29,14 +29,7 @@ export function AppRouter() {
           }
         />
         <Route path="/posts/:id" element={<PostDetailPage />} />
-        <Route
-          path="/profile/:username"
-          element={
-            <AuthGuard>
-              <ProfilePage />
-            </AuthGuard>
-          }
-        />
+        <Route path="/profile/:username" element={<ProfilePage />} />
         <Route
           path="/profile/me"
           element={

@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AvatarMenu } from '@components/AvatarMenu';
+import { useAppSelector } from '@app/hooks';
+import { selectIsAuthenticated } from '@features/auth/auth.slice';
 import { FileText, Hash, Home, Search, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -63,6 +65,7 @@ function getErrorMessage(error: unknown): string {
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const q = (searchParams.get('q') ?? '').trim();
@@ -176,7 +179,24 @@ export function SearchPage() {
             <Home className="h-4 w-4" />
             Home
           </button>
-          <AvatarMenu size="sm" />
+          {isAuthenticated ? (
+            <AvatarMenu size="sm" />
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 text-neutral-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all tap-feedback"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-all tap-feedback"
+              >
+                Register
+              </button>
+            </>
+          )}
         </div>
       </header>
 

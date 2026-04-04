@@ -23,7 +23,6 @@ export class UsersController {
   }
 
   @Get('username/:username')
-  @UseGuards(JwtAuthGuard)
   findByUsername(@Param('username') username: string) {
     return this.usersService.getProfileByUsername(username);
   }
