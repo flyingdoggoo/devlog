@@ -118,8 +118,9 @@
 - Backend build command: `npm run build` (inside `backend`).
 - Frontend typecheck command: `npx tsc -b` (inside `frontend`).
 - Render deployment baseline now exists:
-  - Root `render.yaml` provisions API web service, static frontend, Postgres, and Key Value.
+  - Root `render.yaml` provisions API web service, static frontend, and Key Value (Postgres now external via Neon).
   - Frontend API client supports `VITE_API_BASE_URL` for cross-domain production calls while retaining local `/api` proxy fallback.
+  - Prisma datasource now uses `DATABASE_URL` + `DIRECT_URL` (`directUrl`) to support Neon pooled runtime connections plus direct migration connections.
   - Deploy notes live in `docs/deploy-render.md`.
 
 ## 7) Keep This Memory Fresh
