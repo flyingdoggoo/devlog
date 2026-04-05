@@ -55,10 +55,12 @@ Trong service `devlog-web`:
 
 Seed KHONG tu chay khi deploy.
 
-- Seed nhe:
-  - `npm run seed:posts-tags`
-- Seed lon:
-  - `npm run seed:large`
+- Seed du lieu mock realistic:
+  - `npm run seed:devlog`
+
+- Neu can xoa sach DB roi seed lai (canh bao: destructive):
+  - Set env `SEED_CONFIRM_RESET=YES`
+  - Chay `npm run seed:devlog:reset`
 
 Chay trong Shell cua service `devlog-api` sau khi deploy xong.
 

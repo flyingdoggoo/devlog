@@ -13,6 +13,8 @@ import { CommentsModule } from './comments/comments.module';
 import { FollowsModule } from './follows/follows.module';
 import { RedisCacheModule } from './cache/redis-cache.module';
 import { SearchModule } from './search/search.module';
+import { UploadsModule } from './uploads/uploads.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { SearchModule } from './search/search.module';
     CommentsModule,
     FollowsModule,
     SearchModule,
+    UploadsModule,
+    BookmarksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

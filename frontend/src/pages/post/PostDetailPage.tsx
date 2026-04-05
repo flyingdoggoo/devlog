@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { postsApi } from '@services/posts.service';
+import { likesApi } from '@services/likes.service';
+import { bookmarksApi } from '@services/bookmarks.service';
 import apiClient from '@services/api';
 import { AvatarMenu } from '@components/AvatarMenu';
 import { useRequireAuthAction } from '@hooks/useRequireAuthAction';
@@ -9,6 +13,8 @@ import type { Comment } from '@/types/comment';
 import type { ApiResponse } from '@/types/api';
 import { selectIsAuthenticated } from '@/features/auth/auth.slice';
 import { useAppSelector } from '@app/hooks';
+import { formatReadTime } from '@/utils/read-metrics';
+import { copyPostShareLink } from '@/utils/share-link';
 import { ArrowUp, Bell, Bookmark, Heart, MessageCircle, Search, Share2 } from 'lucide-react';
 function formatDate(dateInput?: string | null) {
   if (!dateInput) return 'Unknown date';
@@ -19,14 +25,8 @@ function formatDate(dateInput?: string | null) {
   });
 }
 
-function getReadTime(content?: string) {
-  if (!content) return '1 min read';
-  const words = content.trim().split(/\s+/).filter(Boolean).length;
-  return `${Math.max(1, Math.ceil(words / 200))} min read`;
-}
-
 export function PostDetailPage() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
   const { requireAuthAction } = useRequireAuthAction();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -38,10 +38,13 @@ export function PostDetailPage() {
   const [readingProgress, setReadingProgress] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [pendingLike, setPendingLike] = useState(false);
+  const [pendingBookmark, setPendingBookmark] = useState(false);
 
   useEffect(() => {
-    if (!id) {
-      setError('Missing post id');
+    if (!slug) {
+      setError('Missing post slug');
       setLoading(false);
       return;
     }
@@ -51,14 +54,22 @@ export function PostDetailPage() {
     const fetchPostDetail = async () => {
       try {
         setLoading(true);
-        const [postRes, commentsRes] = await Promise.all([
-          postsApi.getPostById(id),
-          apiClient.get<ApiResponse<Comment[]>>(`/posts/${id}/comments`),
-        ]);
+        const postRes = await postsApi.getPostBySlug(slug);
+        const postData = postRes.data;
+
+        if (!postData?.id) {
+          if (!active) return;
+          setPost(null);
+          setComments([]);
+          setError('Post not found');
+          return;
+        }
+
+        const commentsRes = await apiClient.get<ApiResponse<Comment[]>>(`/posts/${postData.id}/comments`);
 
         if (!active) return;
 
-        setPost(postRes.data);
+        setPost(postData);
         setComments(commentsRes.data.data ?? []);
         setError(null);
       } catch (err: any) {
@@ -74,7 +85,7 @@ export function PostDetailPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [slug]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -94,18 +105,18 @@ export function PostDetailPage() {
   );
 
   const handlePostComment = async () => {
-    if (!id || !newComment.trim()) return;
+    if (!post?.id || !newComment.trim()) return;
     if (!requireAuthAction()) return;
 
     try {
       setPostingComment(true);
       setError(null);
 
-      await apiClient.post<ApiResponse<Comment>>(`/posts/${id}/comments`, {
+      await apiClient.post<ApiResponse<Comment>>(`/posts/${post.id}/comments`, {
         content: newComment.trim(),
       });
 
-      const commentsRes = await apiClient.get<ApiResponse<Comment[]>>(`/posts/${id}/comments`);
+      const commentsRes = await apiClient.get<ApiResponse<Comment[]>>(`/posts/${post.id}/comments`);
       setComments(commentsRes.data.data ?? []);
       setNewComment('');
 
@@ -126,6 +137,83 @@ export function PostDetailPage() {
     } finally {
       setPostingComment(false);
     }
+  };
+
+  const handleSharePost = async () => {
+    if (!post?.slug) return;
+
+    try {
+      await copyPostShareLink(post.slug);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1600);
+    } catch {}
+  };
+
+  const handleLikePost = async () => {
+    if (!post?.id || pendingLike) return;
+    if (!requireAuthAction()) return;
+
+    const isLiked = Boolean(post.isLikedByMe);
+
+    try {
+      setPendingLike(true);
+      if (isLiked) {
+        await likesApi.unlikePost(post.id);
+      } else {
+        await likesApi.likePost(post.id);
+      }
+
+      setPost((prev) => {
+        if (!prev) return prev;
+
+        const currentLikes = prev._count?.likes ?? 0;
+        return {
+          ...prev,
+          isLikedByMe: !isLiked,
+          _count: {
+            likes: isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1,
+            comments: prev._count?.comments ?? 0,
+          },
+        };
+      });
+    } catch {
+      setError('Failed to update like status');
+    } finally {
+      setPendingLike(false);
+    }
+  };
+
+  const handleBookmarkPost = async () => {
+    if (!post?.id || pendingBookmark) return;
+    if (!requireAuthAction()) return;
+
+    const isBookmarked = Boolean(post.isBookmarkedByMe);
+
+    try {
+      setPendingBookmark(true);
+      if (isBookmarked) {
+        await bookmarksApi.unbookmarkPost(post.id);
+      } else {
+        await bookmarksApi.bookmarkPost(post.id);
+      }
+
+      setPost((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          isBookmarkedByMe: !isBookmarked,
+        };
+      });
+    } catch {
+      setError('Failed to update bookmark status');
+    } finally {
+      setPendingBookmark(false);
+    }
+  };
+
+  const scrollToComments = () => {
+    document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   if (loading) {
@@ -244,19 +332,34 @@ export function PostDetailPage() {
               </div>
 
               <div className="bg-white/70 backdrop-blur-xl border border-neutral-200/40 flex flex-col gap-6 p-3 rounded-full shadow-sm">
-                <button className="flex flex-col items-center gap-1 group" onClick={() => requireAuthAction()}>
-                  <Heart className="h-4 w-4 text-neutral-600 group-hover:text-rose-600 transition-colors" />
-                  <span className="text-[10px] font-bold text-neutral-600">{post._count?.likes ?? 0}</span>
+                <button
+                  className={`flex flex-col items-center gap-1 group ${pendingLike ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={handleLikePost}
+                  disabled={pendingLike}
+                >
+                  <Heart
+                    className={`h-4 w-4 transition-colors ${post.isLikedByMe ? 'text-rose-600 fill-current' : 'text-neutral-600 group-hover:text-rose-600'}`}
+                  />
+                  <span className={`text-[10px] font-bold ${post.isLikedByMe ? 'text-rose-600' : 'text-neutral-600'}`}>
+                    {post._count?.likes ?? 0}
+                  </span>
                 </button>
-                <button className="flex flex-col items-center gap-1 group">
+                <button className="flex flex-col items-center gap-1 group" onClick={scrollToComments}>
                   <MessageCircle className="h-4 w-4 text-neutral-600 group-hover:text-blue-600 transition-colors" />
                   <span className="text-[10px] font-bold text-neutral-600">{post._count?.comments ?? 0}</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 group" onClick={() => requireAuthAction()}>
-                  <Bookmark className="h-4 w-4 text-neutral-600 group-hover:text-violet-600 transition-colors" />
+                <button
+                  className={`flex flex-col items-center gap-1 group ${pendingBookmark ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={handleBookmarkPost}
+                  disabled={pendingBookmark}
+                >
+                  <Bookmark
+                    className={`h-4 w-4 transition-colors ${post.isBookmarkedByMe ? 'text-violet-600 fill-current' : 'text-neutral-600 group-hover:text-violet-600'}`}
+                  />
                 </button>
-                <button className="flex flex-col items-center gap-1 group">
+                <button className="flex flex-col items-center gap-1 group" onClick={handleSharePost}>
                   <Share2 className="h-4 w-4 text-neutral-600 group-hover:text-emerald-600 transition-colors" />
+                  <span className="text-[10px] font-bold text-neutral-600">{shareCopied ? 'Copied' : 'Share'}</span>
                 </button>
               </div>
             </div>
@@ -311,22 +414,49 @@ export function PostDetailPage() {
                       </button>
                     </div>
                     <div className="text-xs text-neutral-500 mt-1">
-                      {formatDate(post.publishedAt || post.createdAt)} • {getReadTime(post.content)}
+                      {formatDate(post.publishedAt || post.createdAt)} • {formatReadTime(post.readTimeMinutes, post.content)}
                     </div>
                   </div>
                 </div>
               </div>
+
+              <div className="mt-6 flex items-center gap-5 lg:hidden text-xs font-semibold text-neutral-600">
+                <button
+                  className={`inline-flex items-center gap-1.5 ${pendingLike ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={handleLikePost}
+                  disabled={pendingLike}
+                >
+                  <Heart className={`h-4 w-4 ${post.isLikedByMe ? 'text-rose-600 fill-current' : ''}`} />
+                  <span className={post.isLikedByMe ? 'text-rose-600' : ''}>{post._count?.likes ?? 0}</span>
+                </button>
+                <button className="inline-flex items-center gap-1.5" onClick={scrollToComments}>
+                  <MessageCircle className="h-4 w-4" />
+                  <span>{post._count?.comments ?? 0}</span>
+                </button>
+                <button
+                  className={`inline-flex items-center gap-1.5 ${pendingBookmark ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={handleBookmarkPost}
+                  disabled={pendingBookmark}
+                >
+                  <Bookmark className={`h-4 w-4 ${post.isBookmarkedByMe ? 'text-violet-600 fill-current' : ''}`} />
+                  <span>{post.isBookmarkedByMe ? 'Saved' : 'Save'}</span>
+                </button>
+                <button className="inline-flex items-center gap-1.5" onClick={handleSharePost}>
+                  <Share2 className="h-4 w-4" />
+                  <span>{shareCopied ? 'Copied' : 'Share'}</span>
+                </button>
+              </div>
             </header>
 
-            <div className="space-y-8 text-lg leading-relaxed text-neutral-700 font-body" id="content">
-              {(post.content || '')
-                .split('\n')
-                .map((paragraph) => paragraph.trim())
-                .filter(Boolean)
-                .map((paragraph, idx) => (
-                  <p key={`${post.id}-p-${idx}`}>{paragraph}</p>
-                ))}
-              {!post.content?.trim() && <p>No content yet.</p>}
+            <div
+              className="max-w-none text-lg leading-relaxed text-neutral-700 font-body [&_h1]:text-4xl [&_h1]:font-bold [&_h1]:leading-tight [&_h1]:mt-10 [&_h1]:mb-5 [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:mt-9 [&_h2]:mb-4 [&_h3]:text-2xl [&_h3]:font-semibold [&_h3]:mt-8 [&_h3]:mb-3 [&_p]:mb-6 [&_ul]:mb-6 [&_ul]:list-disc [&_ul]:pl-7 [&_ol]:mb-6 [&_ol]:list-decimal [&_ol]:pl-7 [&_blockquote]:border-l-4 [&_blockquote]:border-neutral-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_pre]:mb-6 [&_pre]:rounded-lg [&_pre]:bg-neutral-900 [&_pre]:p-4 [&_pre]:text-neutral-100 [&_pre]:overflow-x-auto [&_pre_code]:bg-transparent [&_pre_code]:text-neutral-100 [&_pre_code]:px-0 [&_pre_code]:py-0 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-neutral-100 [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5 [&_img]:rounded-xl [&_img]:my-6"
+              id="content"
+            >
+              {post.content?.trim() ? (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+              ) : (
+                <p>No content yet.</p>
+              )}
             </div>
 
             <section className="mt-24 pt-12 border-t border-neutral-200" id="comments">

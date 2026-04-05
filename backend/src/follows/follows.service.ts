@@ -1,11 +1,30 @@
 import { Injectable } from '@nestjs/common';
 import { CreateFollowDto } from './dto/create-follow.dto';
-import { UpdateFollowDto } from './dto/update-follow.dto';
 import { PrismaService } from '@prisma/prisma.service';
-import { NotFoundException, HttpException, HttpStatus, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
+
+const followUserSelect = {
+  id: true,
+  name: true,
+  username: true,
+  avatarUrl: true,
+};
+
 @Injectable()
 export class FollowsService {
   constructor(private prisma: PrismaService) { }
+
+  private async ensureActiveUser(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId, active: true },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+  }
+
   async follow(createFollowDto: CreateFollowDto, userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId, active: true }
@@ -59,13 +78,13 @@ export class FollowsService {
         followerId_followingId: {
           followerId: userId,
           followingId: followingId
-        },
-        active: true
+        }
       }
     });
-    if (!isFollow) {
+    if (!isFollow || !isFollow.active) {
       throw new NotFoundException('Not following');
     }
+
     return this.prisma.follow.update({
       where: {
         followerId_followingId: {
@@ -80,6 +99,8 @@ export class FollowsService {
   }
 
   async getAllFollowers(userId: string) {
+    await this.ensureActiveUser(userId);
+
     return this.prisma.follow.findMany({
       where: {
         followingId: userId,
@@ -87,16 +108,15 @@ export class FollowsService {
       },
       include: {
         follower: {
-          select: {
-            id: true,
-            name: true
-          },
+          select: followUserSelect,
         },
       }
     });
   }
 
   async getFollowings(userId: string) {
+    await this.ensureActiveUser(userId);
+
     return this.prisma.follow.findMany({
       where: {
         followerId: userId,
@@ -104,12 +124,17 @@ export class FollowsService {
       },
       include: {
         following: {
-          select: {
-            id: true,
-            name: true
-          }
+          select: followUserSelect,
         }
       }
     });
+  }
+
+  async getFollowersByUserId(userId: string) {
+    return this.getAllFollowers(userId);
+  }
+
+  async getFollowingsByUserId(userId: string) {
+    return this.getFollowings(userId);
   }
 }

@@ -2,13 +2,14 @@ import { useNavigate } from 'react-router-dom';
 import { FormEvent, useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAppDispatch, useAppSelector } from '@app/hooks';
-import { loginSuccess, selectCurrentUser } from '@features/auth/auth.slice';
+import { loginSuccess, selectCurrentUser, selectIsAuthenticated } from '@features/auth/auth.slice';
 import { usersApi } from '@services/users.service';
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +25,12 @@ export function SettingsPage() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     const fetchMe = async () => {
       setLoading(true);
       setError(null);
@@ -46,7 +53,7 @@ export function SettingsPage() {
     };
 
     fetchMe();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleUsernameUpdate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

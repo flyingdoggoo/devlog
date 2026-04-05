@@ -4,6 +4,22 @@ import { loginStart, loginSuccess, loginFailure, markAuthInitialized, logout } f
 import type { LoginDto, RegisterDto } from '@services/auth.service';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const AUTH_HINT_KEY = 'devlog.auth.hint';
+
+function setAuthHint() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(AUTH_HINT_KEY, '1');
+}
+
+function clearAuthHint() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(AUTH_HINT_KEY);
+}
+
+function hasAuthHint() {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(AUTH_HINT_KEY) === '1';
+}
 
 async function getCurrentUserWithRetry(maxAttempts = 5): Promise<Awaited<ReturnType<typeof authApi.getCurrentUser>>> {
   let lastError: any = null;
@@ -53,12 +69,14 @@ export const login = createAsyncThunk(
       const user = await getCurrentUserWithRetry();
       
       // Bước 4: Update Redux state
+      setAuthHint();
       dispatch(loginSuccess(user));
       
       return user;
     } catch (error: any) {
       console.error('Login error:', error);
       const errorMessage = normalizeAuthError(error);
+      clearAuthHint();
       dispatch(loginFailure(errorMessage));
       return rejectWithValue(errorMessage);
     }
@@ -69,6 +87,7 @@ export const loginWithGoogle = createAsyncThunk(
   'auth/loginWithGoogle',
   async () => {
     // Triggers redirect - state will be restored via checkAuth on return
+    setAuthHint();
     authApi.loginWithGoogle();
   }
 );
@@ -89,6 +108,7 @@ export const register = createAsyncThunk(
       });
 
       const user = await getCurrentUserWithRetry();
+      setAuthHint();
       dispatch(loginSuccess(user));
 
       return user;
@@ -96,6 +116,7 @@ export const register = createAsyncThunk(
       console.error('Register error:', error);
       const errorMessage = normalizeAuthError(error);
 
+      clearAuthHint();
       dispatch(loginFailure(errorMessage));
       return rejectWithValue(errorMessage);
     }
@@ -110,6 +131,7 @@ export const logoutThunk = createAsyncThunk(
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      clearAuthHint();
       dispatch(logout());
     }
   }
@@ -118,11 +140,18 @@ export const logoutThunk = createAsyncThunk(
 export const checkAuth = createAsyncThunk(
   'auth/checkAuth',
   async (_, { dispatch }) => {
+    if (!hasAuthHint()) {
+      dispatch(markAuthInitialized());
+      return null;
+    }
+
     try {
       const user = await authApi.getCurrentUser();
+      setAuthHint();
       dispatch(loginSuccess(user));
       return user;
     } catch {
+      clearAuthHint();
       dispatch(markAuthInitialized());
       return null;
     }

@@ -14,6 +14,7 @@ export interface Post {
   content: string;
   excerpt?: string | null;
   coverImageUrl?: string | null;
+  readTimeMinutes?: number;
   status: PostStatus;
   viewCount: number;
   publishedAt?: string | null;
@@ -21,6 +22,7 @@ export interface Post {
   updatedAt: string;
   author?: User;
   isLikedByMe? : boolean;
+  isBookmarkedByMe?: boolean;
   comments?: {
     id: string;
     content: string;
@@ -55,6 +57,7 @@ export interface CreatePostDto {
   content: string;
   excerpt?: string;
   coverImageUrl?: string;
+  readTimeMinutes?: number;
   tagIds?: string[];
   status?: PostStatus;
   publishedAt?: string;

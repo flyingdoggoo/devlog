@@ -14,6 +14,7 @@ import {
   type SearchType,
   type SearchUserItem,
 } from '@services/search.service';
+import { getPostPreviewText } from '@/utils/preview-text';
 
 const PAGE_SIZE = 20;
 const TAB_OPTIONS: Array<{ value: SearchType; label: string; icon: LucideIcon; activeClass: string }> = [
@@ -271,11 +272,11 @@ export function SearchPage() {
                 <article
                   key={item.id}
                   className="bg-white border border-neutral-200 rounded-xl p-5 cursor-pointer hover:border-blue-200 interactive-card tap-feedback"
-                  onClick={() => navigate(`/posts/${item.id}`)}
+                  onClick={() => navigate(`/posts/${item.slug}`)}
                 >
                   <h3 className="font-semibold text-lg">{item.title}</h3>
                   <p className="text-sm text-neutral-600 mt-1 line-clamp-2">
-                    {item.excerpt || 'No excerpt'}
+                    {getPostPreviewText(item.excerpt, undefined, { fallback: 'No excerpt' })}
                   </p>
                   <div className="mt-3 flex items-center gap-4 text-xs text-neutral-500">
                     <span>@{item.author?.username ?? 'unknown'}</span>
@@ -308,7 +309,11 @@ export function SearchPage() {
 
             {type === 'tags' &&
               tagItems.map((item) => (
-                <article key={item.id} className="bg-white border border-neutral-200 rounded-xl p-5 interactive-card">
+                <article
+                  key={item.id}
+                  className="bg-white border border-neutral-200 rounded-xl p-5 interactive-card cursor-pointer hover:border-orange-200 tap-feedback"
+                  onClick={() => navigate(`/tags?tagId=${item.id}`)}
+                >
                   <h3 className="font-semibold text-lg">#{item.name}</h3>
                   <p className="text-xs text-neutral-500 mt-1">{item.postCount} published posts</p>
                 </article>

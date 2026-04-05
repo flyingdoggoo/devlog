@@ -27,7 +27,7 @@ model Account {
 
 model Credential {
   id           String   @id @default(uuid())
-  userId       String   
+  userId       String
   email        String   @unique
   passwordHash String
   createdAt    DateTime @default(now())
@@ -49,6 +49,7 @@ model User {
   id                    String         @id @default(uuid())
   username              String         @unique
   name                  String?
+  bio                   String?
   createdAt             DateTime       @default(now())
   active                Boolean        @default(true)
   avatarUrl             String?
@@ -58,6 +59,7 @@ model User {
   posts                 Post[]
   comments              Comment[]
   likes                 Like[]
+  bookmarks             Bookmark[]
   followers             Follow[]       @relation("Follower")
   following             Follow[]       @relation("Following")
   notificationsReceived Notification[] @relation("NotificationReceiver")
@@ -71,23 +73,25 @@ enum PostStatus {
 }
 
 model Post {
-  id            String         @id @default(uuid())
-  authorId      String
-  title         String
-  slug          String         @unique
-  content       String         @default("")
-  excerpt       String         @default("")
-  coverImageUrl String         @default("")
-  viewCount     Int            @default(0)
-  status        PostStatus     @default(DRAFT)
-  publishedAt   DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  author        User           @relation(fields: [authorId], references: [id])
-  tags          PostTag[]
-  comments      Comment[]
-  likes         Like[]
-  notifications Notification[]
+  id              String         @id @default(uuid())
+  authorId        String
+  title           String
+  slug            String         @unique
+  content         String         @default("")
+  excerpt         String         @default("")
+  coverImageUrl   String         @default("")
+  readTimeMinutes Int            @default(1)
+  viewCount       Int            @default(0)
+  status          PostStatus     @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  author          User           @relation(fields: [authorId], references: [id])
+  tags            PostTag[]
+  comments        Comment[]
+  likes           Like[]
+  bookmarks       Bookmark[]
+  notifications   Notification[]
 
   @@index([authorId, createdAt])
   @@index([status, createdAt])
@@ -115,7 +119,7 @@ model Comment {
   authorId  String
   content   String
   parentId  String?
-  active    Boolean  @default(true)
+  active    Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   parent    Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
@@ -139,6 +143,21 @@ model Like {
 
   @@unique([postId, userId])
   @@index([postId, active])
+}
+
+model Bookmark {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([postId, active])
+  @@index([userId, active, createdAt])
 }
 
 model Follow {

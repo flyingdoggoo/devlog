@@ -4,7 +4,9 @@ import type { User } from '../types/user';
 
 export interface ProfilePost {
   id: string;
+  slug: string;
   title: string;
+  excerpt?: string | null;
   content: string;
   createdAt: string;
   _count: {
