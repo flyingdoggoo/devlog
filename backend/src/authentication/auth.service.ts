@@ -8,6 +8,7 @@ import { RegisterDto } from '@authentication/dto/register.dto';
 import { Payload } from '@authentication/interface/payload.interface';
 import { GoogleUser } from './interface/request-with-google-user-interface';
 import { PrismaService } from '@prisma/prisma.service';
+import ms from 'ms';
 
 @Injectable()
 export class AuthService {
@@ -68,33 +69,32 @@ export class AuthService {
     // Tao bo cookie Authentication + RefreshToken + SessionId cho user.
     // Neu co sessionId hop le thi rotate token tren session do, khong thi tao session moi.
     private async issueSessionCookies(userId: string, sessionId?: string) {
-        const accessTokenTTL = Number(this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900;
-        const refreshTokenTTL = Number(this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')) || 604800;
+        const accessTokenTTL = (this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME'));
+        const refreshTokenTTL = (this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME'));
+
         const accessToken = this.jwtService.sign({ userId } as Payload);
         const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const refreshToken = randomBytes(64).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-        const expires = new Date(Date.now() + refreshTokenTTL * 1000);
+        const expires = new Date(Date.now() + ms(refreshTokenTTL));
+        const accessMaxAge  = Math.floor(Number(ms(accessTokenTTL))  / 1000);
+        const refreshMaxAge = Math.floor(Number(ms(refreshTokenTTL)) / 1000);
 
-        const session = await this.prisma.session.upsert({
-            where: {
-                id: sessionId || 'non-existent-session-id',
-            },
-            update: {
-                refreshTokenHash,
-                expires,
-            },
-            create: {
-                userId,
-                refreshTokenHash,
-                expires,
-            },
-        });
+        const session = sessionId
+            ? await this.prisma.session.upsert({
+                where: { id: sessionId },
+                update: { refreshTokenHash, expires },
+                create: { userId, refreshTokenHash, expires },
+            })
+            : await this.prisma.session.create({
+                data: { userId, refreshTokenHash, expires },
+            });
+
         const effectiveSessionId = session.id;
-        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessMaxAge}; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/api/auth; Max-Age=${refreshMaxAge}; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/api/auth; Max-Age=${refreshMaxAge}; SameSite=${sameSite}${secureFlag}`;
         return [authCookie, refreshCookie, sessionCookie];
     }
 

@@ -4,9 +4,6 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 // Local dev: keep empty to use Vite proxy '/api' -> localhost backend.
 const rawApiBase = import.meta.env.VITE_API_BASE_URL ?? '';
 
-// Normalize to avoid double prefix:
-// - https://api.onrender.com     -> https://api.onrender.com/api
-// - https://api.onrender.com/api -> https://api.onrender.com/api
 const normalizedBase = rawApiBase.trim().replace(/\/+$/, '').replace(/\/api$/i, '');
 
 export const apiClient = axios.create({
@@ -28,16 +25,51 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor - handle errors globally
+let isRefreshing = false;
+let failedQueue: Array<{
+    resolve: (value: unknown) => void;
+    reject: (reason?: unknown) => void;
+}> = [];
+
+const processQueue = (error: AxiosError | null) => {
+    failedQueue.forEach(({ resolve, reject }) => {
+        error ? reject(error) : resolve(undefined);
+    });
+    failedQueue = [];
+};
+
 apiClient.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError<{ message: string }>) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized - redirect to login or refresh token
-      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    (response) => response,
+    async (error: AxiosError<{ message: string }>) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+        if (error.response?.status !== 401 || originalRequest._retry) {
+            return Promise.reject(error);
+        }
+
+        // Nếu đang refresh rồi, queue request lại thay vì gọi refresh song song
+        if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+                failedQueue.push({ resolve, reject });
+            }).then(() => apiClient(originalRequest))
+              .catch(Promise.reject);
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+            await apiClient.post('/auth/refresh'); // cookie RefreshToken + SessionId tự đính kèm
+            processQueue(null);
+            return apiClient(originalRequest); // retry request gốc
+        } catch (refreshError) {
+            processQueue(refreshError as AxiosError);
+            window.dispatchEvent(new CustomEvent('auth:unauthorized')); // redirect login
+            return Promise.reject(refreshError);
+        } finally {
+            isRefreshing = false;
+        }
     }
-    return Promise.reject(error);
-  }
 );
 
 export default apiClient;
