@@ -1,43 +1,59 @@
-# Seed Mock Data IT Social vào Neon
+# Seed DevLog Mock Data vao Neon
 
-Script: `backend/scripts/seed-it-social.ts`
+Script: `backend/scripts/seed-devlog.ts`
 
-## Mục tiêu script
+## Muc tieu script
 
-- Tạo dữ liệu social thực tế theo chủ đề IT/AI/ML/Software Engineering.
-- Sinh:
-  - 20-50 users (default 30)
-  - Mỗi user 2-5 posts
-  - Mỗi post 2-10 comments
-- Ghi snapshot JSON ra:
-  - `backend/scripts/output/seed-it-social.json`
+- Chi con 1 script seed duy nhat cho du an.
+- Tao du lieu social realistic cho demo va test:
+  - Users + credentials
+  - Posts markdown (co heading/list/code block)
+  - Tags
+  - Follows, comments (co replies), likes, bookmarks
 
-## Chạy local với Neon (PowerShell)
+## Chay voi Neon (PowerShell)
 
 ```powershell
 cd backend
-$env:DATABASE_URL="postgresql://<pooled-url>"
-$env:DIRECT_URL="postgresql://<direct-url>"
-npm run seed:it-social
+$env:DATABASE_URL="postgresql://<pooled-url>?sslmode=require"
+$env:DIRECT_URL="postgresql://<direct-url>?sslmode=require"
+npx prisma migrate deploy
+npm run seed:devlog
 ```
 
-Custom số user:
+Tuy chinh so luong:
 
 ```powershell
-npm run seed:it-social -- --users=40
+npm run seed:devlog -- --users=30 --posts=120 --password=Devlog@123
 ```
 
-## Chạy local với Neon (bash/zsh)
+## Reset + reseed an toan (PowerShell)
+
+Canh bao: reset mode se xoa toan bo du lieu app (users/posts/tags/follows/comments/likes/bookmarks...).
+
+```powershell
+cd backend
+$env:DATABASE_URL="postgresql://<pooled-url>?sslmode=require"
+$env:DIRECT_URL="postgresql://<direct-url>?sslmode=require"
+$env:SEED_CONFIRM_RESET="YES"
+npx prisma migrate deploy
+npm run seed:devlog:reset -- --users=30 --posts=120 --password=Devlog@123
+```
+
+Neu khong set `SEED_CONFIRM_RESET=YES` thi script se tu choi reset.
+
+## Chay voi bash/zsh
 
 ```bash
 cd backend
-export DATABASE_URL="postgresql://<pooled-url>"
-export DIRECT_URL="postgresql://<direct-url>"
-npm run seed:it-social
+export DATABASE_URL="postgresql://<pooled-url>?sslmode=require"
+export DIRECT_URL="postgresql://<direct-url>?sslmode=require"
+npx prisma migrate deploy
+npm run seed:devlog
 ```
 
-## Lưu ý
+## Luu y
 
-- Script dùng PrismaClient, dữ liệu sẽ ghi trực tiếp vào DB đang trỏ bởi `DATABASE_URL`.
-- Cần chạy migrate trước seed nếu schema vừa thay đổi:
-  - `npx prisma migrate deploy`
+- Dung dung bo `DATABASE_URL`/`DIRECT_URL` hien tai cua moi truong deploy.
+- Khong commit connection string that.
+- Script in ra sample accounts va mat khau seed de dang nhap nhanh.

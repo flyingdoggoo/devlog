@@ -26,10 +26,12 @@ export class PostsController {
     return this.postsService.findAllPosts(Number(page), Number(limit), userId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a post by ID' })
-  findPostById(@Param('id') id: string) {
-    return this.postsService.findPostById(id);
+  @Get(':slug')
+  @ApiOperation({ summary: 'Get a post by slug' })
+  @UseGuards(OptionalJwtAuthGuard)
+  findPostBySlug(@Param('slug') slug: string, @Req() req?) {
+    const userId = req?.user?.userId;
+    return this.postsService.findPostBySlug(slug, userId);
   }
 
   @Patch(':id')

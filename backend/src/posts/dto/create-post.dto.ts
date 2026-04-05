@@ -1,4 +1,4 @@
-import { MinLength, IsString, IsEnum, IsOptional, IsArray, IsUUID } from "class-validator";
+import { MinLength, IsString, IsEnum, IsOptional, IsArray, IsUUID, IsInt, Min } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { PostStatus } from "@prisma/client";
@@ -7,13 +7,13 @@ export class CreatePostDto {
     @MinLength(3, { message: 'Title should be at least 3 characters long' })
     @Transform(({ value }) => value.trim())
     @ApiProperty({ example: 'My First Blog Post' })
-    title: string;
+    title!: string;
 
     @IsString({ message: 'Content must be a string' })
     @MinLength(8, { message: 'Content should be at least 8 characters long' })
     @Transform(({ value }) => value.trim())
     @ApiProperty({ example: 'This is the content of my first blog post.' })
-    content: string;
+    content!: string;
 
     @ApiPropertyOptional({ enum: PostStatus, default: 'PUBLISHED' })
     @IsEnum(PostStatus, { message: 'Status must be either DRAFT or PUBLISHED' })
@@ -59,4 +59,13 @@ export class CreatePostDto {
     @IsString({ message: 'Excerpt must be a string' })
     @MinLength(8, { message: 'Excerpt should be at least 8 characters long' })
     excerpt?: string;
+
+    @ApiPropertyOptional({
+        description: 'Estimated reading time in minutes',
+        example: 6,
+    })
+    @IsOptional()
+    @IsInt({ message: 'Read time must be an integer number of minutes' })
+    @Min(1, { message: 'Read time must be at least 1 minute' })
+    readTimeMinutes?: number;
 }

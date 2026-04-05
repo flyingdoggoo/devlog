@@ -1,4 +1,9 @@
-import { User } from './user';
+export interface FollowProfileUser {
+  id: string;
+  name: string | null;
+  username: string;
+  avatarUrl: string | null;
+}
 
 export interface Follow {
   id: string;
@@ -6,9 +11,8 @@ export interface Follow {
   followingId: string;
   active: boolean;
   createdAt: string;
-  updatedAt: string;
-  follower?: User;
-  following?: User;
+  follower?: FollowProfileUser;
+  following?: FollowProfileUser;
 }
 
 export interface CreateFollowDto {

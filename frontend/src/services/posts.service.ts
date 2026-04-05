@@ -2,14 +2,24 @@ import apiClient from '@services/api';
 import type { Post, CreatePostDto, UpdatePostDto } from '../types/post';
 import type { ApiResponse } from '../types/api';
 
+export interface PaginatedPosts {
+  items: Post[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export const postsApi = {
-  getAllPost: async(page = 1, limit = 10) => {
-    const response = await apiClient.get(`/posts?page=${page}&limit=${limit}`);
+  getAllPost: async (page = 1, limit = 10): Promise<PaginatedPosts> => {
+    const response = await apiClient.get<ApiResponse<PaginatedPosts>>('/posts', {
+      params: { page, limit },
+    });
     return response.data.data;
   },
 
-  getPostById: async (id: string): Promise<ApiResponse<Post>> => {
-    const response = await apiClient.get(`/posts/${id}`);
+  getPostBySlug: async (slug: string): Promise<ApiResponse<Post>> => {
+    const response = await apiClient.get(`/posts/${slug}`);
     return response.data;
   },
 

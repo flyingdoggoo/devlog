@@ -1,18 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '@app/hooks';
-import { selectCurrentUser, selectIsAuthenticated } from '@features/auth/auth.slice';
+import { selectCurrentUser } from '@features/auth/auth.slice';
 import { AvatarMenu } from '@components/AvatarMenu';
 import { usersApi, type UserProfile } from '@services/users.service';
+import { followsApi } from '@services/follows.service';
+import type { Follow } from '@/types/follow';
+import { useRequireAuthAction } from '@hooks/useRequireAuthAction';
 import axios from 'axios';
+import { getPostPreviewText } from '@/utils/preview-text';
 import {
   BarChart3,
   Bell,
   Bookmark,
   CalendarDays,
-  Compass,
   Heart,
   Home,
+  Loader2,
   Mail,
   MessageCircle,
   Plus,
@@ -21,11 +25,15 @@ import {
   Share2,
   TrendingUp,
   User,
+  UserMinus,
+  UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 
 const intensityClasses = ['bg-[#ececec]', 'bg-[#d7d7d7]', 'bg-[#a9a9a9]', 'bg-black'];
 const HEATMAP_CELLS = 52 * 7;
+type NetworkTab = 'followers' | 'following';
 
 function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -81,20 +89,117 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { username } = useParams<{ username: string }>();
   const currentUser = useAppSelector(selectCurrentUser);
-  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { isAuthenticated, requireAuthAction } = useRequireAuthAction();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profileImageError, setProfileImageError] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowActionLoading, setIsFollowActionLoading] = useState(false);
+  const [followActionError, setFollowActionError] = useState<string | null>(null);
+  const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
+  const [networkTab, setNetworkTab] = useState<NetworkTab>('followers');
+  const [networkLoading, setNetworkLoading] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [followers, setFollowers] = useState<Follow[]>([]);
+  const [following, setFollowing] = useState<Follow[]>([]);
 
   const isMeRoute = !username;
   const isOwnProfile = !!currentUser && !!profile && currentUser.id === profile.id;
+
+  const selectedNetworkItems = networkTab === 'followers' ? followers : following;
+
+  const loadNetworkData = useCallback(async (targetUserId: string) => {
+    setNetworkLoading(true);
+    setNetworkError(null);
+
+    try {
+      const [followersData, followingData] = await Promise.all([
+        followsApi.getUserFollowers(targetUserId),
+        followsApi.getUserFollowing(targetUserId),
+      ]);
+
+      setFollowers(followersData);
+      setFollowing(followingData);
+    } catch (err) {
+      setNetworkError(getErrorMessage(err));
+    } finally {
+      setNetworkLoading(false);
+    }
+  }, []);
+
+  const openNetworkModal = async (tab: NetworkTab) => {
+    if (!profile) return;
+
+    setNetworkTab(tab);
+    setIsNetworkModalOpen(true);
+    await loadNetworkData(profile.id);
+  };
+
+  const closeNetworkModal = () => {
+    setIsNetworkModalOpen(false);
+    setNetworkError(null);
+  };
+
+  const handleToggleFollow = async () => {
+    if (!profile || isOwnProfile || isFollowActionLoading) return;
+
+    const canProceed = requireAuthAction();
+    if (!canProceed) return;
+
+    setFollowActionError(null);
+    setIsFollowActionLoading(true);
+
+    try {
+      if (isFollowing) {
+        await followsApi.unfollowUser(profile.id);
+        setIsFollowing(false);
+        setProfile((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            _count: {
+              ...prev._count,
+              followers: Math.max(0, prev._count.followers - 1),
+            },
+          };
+        });
+      } else {
+        await followsApi.followUser(profile.id);
+        setIsFollowing(true);
+        setProfile((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            _count: {
+              ...prev._count,
+              followers: prev._count.followers + 1,
+            },
+          };
+        });
+      }
+
+      if (isNetworkModalOpen) {
+        await loadNetworkData(profile.id);
+      }
+    } catch (err) {
+      setFollowActionError(getErrorMessage(err));
+    } finally {
+      setIsFollowActionLoading(false);
+    }
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
       setError(null);
+      setFollowActionError(null);
+      setIsFollowing(false);
+      setIsNetworkModalOpen(false);
+      setFollowers([]);
+      setFollowing([]);
+      setNetworkError(null);
 
       try {
         const data = isMeRoute
@@ -112,6 +217,33 @@ export function ProfilePage() {
 
     fetchProfile();
   }, [isMeRoute, username]);
+
+  useEffect(() => {
+    let active = true;
+
+    const syncFollowState = async () => {
+      if (!isAuthenticated || !currentUser?.id || !profile || currentUser.id === profile.id) {
+        setIsFollowing(false);
+        return;
+      }
+
+      try {
+        const myFollowing = await followsApi.getMyFollowing();
+        if (!active) return;
+
+        setIsFollowing(myFollowing.some((entry) => entry.followingId === profile.id && entry.active));
+      } catch {
+        if (!active) return;
+        setIsFollowing(false);
+      }
+    };
+
+    syncFollowState();
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id, isAuthenticated, profile?.id]);
 
   const displayName = profile?.name || profile?.username || 'Developer';
   const initials = (displayName[0] || 'U').toUpperCase();
@@ -180,9 +312,6 @@ export function ProfilePage() {
             >
               Home
             </button>
-            <button className="text-neutral-500 font-medium hover:bg-emerald-50 hover:text-emerald-700 transition-colors duration-150 px-3 py-1 rounded tap-feedback">
-              Explore
-            </button>
             <button className="text-black font-bold border-b-2 border-black px-3 py-1">
               Profile
             </button>
@@ -236,15 +365,14 @@ export function ProfilePage() {
           <Home className="h-4 w-4 text-sky-600" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Home</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
-          <Compass className="h-4 w-4 text-emerald-600" />
-          <span className="font-['Inter'] text-sm font-medium tracking-wide">Explore</span>
-        </button>
         <button className="text-black bg-[#e2e2e2] px-4 py-2 flex items-center gap-3 rounded-lg">
           <User className="h-4 w-4 text-violet-600" />
           <span className="font-['Inter'] text-sm font-semibold tracking-wide">Profile</span>
         </button>
-        <button className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+        <button
+          className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card"
+          onClick={() => requireAuthAction(() => navigate('/bookmarks'))}
+        >
           <Bookmark className="h-4 w-4 text-blue-700" />
           <span className="font-['Inter'] text-sm font-medium tracking-wide">Bookmarks</span>
         </button>
@@ -257,7 +385,10 @@ export function ProfilePage() {
             <Plus className="h-4 w-4" />
             Create Post
           </button>
-          <button className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card">
+          <button
+            className="w-full text-left text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all duration-150 rounded-lg interactive-card"
+            onClick={() => requireAuthAction(() => navigate('/settings'))}
+          >
             <Settings className="h-4 w-4 text-amber-600" />
             <span className="font-['Inter'] text-sm font-medium tracking-wide">Settings</span>
           </button>
@@ -289,7 +420,7 @@ export function ProfilePage() {
                   <h1 className="text-4xl font-['Space_Grotesk'] font-bold tracking-tight">{displayName}</h1>
                   <p className="text-neutral-500 font-medium">@{profile.username}</p>
                 </div>
-                {isOwnProfile && (
+                {isOwnProfile ? (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-3 py-1 rounded-full bg-black text-white text-xs font-semibold uppercase tracking-wider">
                       Your profile
@@ -301,6 +432,29 @@ export function ProfilePage() {
                       Edit in settings
                     </button>
                   </div>
+                ) : (
+                  <button
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-300 text-sm font-semibold hover:bg-neutral-100 disabled:opacity-70 disabled:cursor-not-allowed"
+                    onClick={handleToggleFollow}
+                    disabled={isFollowActionLoading}
+                  >
+                    {isFollowActionLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Updating...
+                      </>
+                    ) : isFollowing ? (
+                      <>
+                        <UserMinus className="h-4 w-4" />
+                        Unfollow
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-4 w-4" />
+                        Follow
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 
@@ -317,6 +471,10 @@ export function ProfilePage() {
                 )}
               </div>
 
+              {followActionError && (
+                <p className="text-xs text-red-600 font-medium">{followActionError}</p>
+              )}
+
             </div>
           </section>
 
@@ -325,14 +483,24 @@ export function ProfilePage() {
               <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.posts}</span>
               <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Total Posts</span>
             </div>
-            <div className="bg-white p-6 flex flex-col items-center justify-center text-center">
-              <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.followers}</span>
-              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Followers</span>
-            </div>
-            <div className="bg-white p-6 flex flex-col items-center justify-center text-center">
+            <button
+              className="bg-white p-6 flex flex-col items-center justify-center text-center hover:bg-neutral-50 transition-colors"
+              onClick={() => {
+                void openNetworkModal('followers');
+              }}
+            >
               <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.following}</span>
+              <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Followers</span>
+            </button>
+            <button
+              className="bg-white p-6 flex flex-col items-center justify-center text-center hover:bg-neutral-50 transition-colors"
+              onClick={() => {
+                void openNetworkModal('following');
+              }}
+            >
+              <span className="text-3xl font-['Space_Grotesk'] font-bold">{profile._count.followers}</span>
               <span className="text-xs uppercase tracking-widest text-neutral-500 mt-1">Following</span>
-            </div>
+            </button>
           </section>
 
           <section className="space-y-4">
@@ -384,11 +552,13 @@ export function ProfilePage() {
 
                   <h4
                     className="text-xl font-['Space_Grotesk'] font-bold group-hover:text-neutral-700 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/posts/${item.id}`)}
+                    onClick={() => navigate(`/posts/${item.slug}`)}
                   >
                     {item.title}
                   </h4>
-                  <p className="mt-2 text-neutral-600 line-clamp-2 leading-relaxed">{item.content}</p>
+                  <p className="mt-2 text-neutral-600 line-clamp-2 leading-relaxed">
+                    {getPostPreviewText(item.excerpt, item.content, { fallback: 'No excerpt' })}
+                  </p>
                   <div className="mt-4 flex items-center gap-6 text-xs font-medium text-neutral-500">
                     <span className="flex items-center gap-1.5">
                       <Heart className="h-4 w-4 text-rose-500" /> {item._count.likes}
@@ -461,6 +631,111 @@ export function ProfilePage() {
           </div>
         </div>
       </aside>
+
+      {isNetworkModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/40 p-4 flex items-center justify-center">
+          <div className="w-full max-w-xl bg-white rounded-2xl border border-neutral-200 shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-neutral-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-blue-600" />
+                <h3 className="text-sm font-bold tracking-wide">{displayName}'s Network</h3>
+              </div>
+              <button
+                className="p-2 rounded-full hover:bg-neutral-100"
+                onClick={closeNetworkModal}
+                aria-label="Close network modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-5 pt-4">
+              <div className="inline-flex bg-neutral-100 rounded-lg p-1 gap-1">
+                <button
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    networkTab === 'followers'
+                      ? 'bg-white text-black shadow-sm'
+                      : 'text-neutral-500 hover:text-black'
+                  }`}
+                  onClick={() => setNetworkTab('followers')}
+                >
+                  Followers ({profile._count.following})
+                </button>
+                <button
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    networkTab === 'following'
+                      ? 'bg-white text-black shadow-sm'
+                      : 'text-neutral-500 hover:text-black'
+                  }`}
+                  onClick={() => setNetworkTab('following')}
+                >
+                  Following ({profile._count.followers})
+                </button>
+              </div>
+            </div>
+
+            <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
+              {networkLoading && (
+                <div className="py-12 text-sm text-neutral-500 flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading network...
+                </div>
+              )}
+
+              {!networkLoading && networkError && (
+                <div className="py-6 text-sm text-red-600 font-medium">{networkError}</div>
+              )}
+
+              {!networkLoading && !networkError && selectedNetworkItems.length === 0 && (
+                <div className="py-10 text-sm text-neutral-500">
+                  No users in this list yet.
+                </div>
+              )}
+
+              {!networkLoading && !networkError && selectedNetworkItems.length > 0 && (
+                <div className="space-y-2">
+                  {selectedNetworkItems.map((entry) => {
+                    const user = networkTab === 'followers' ? entry.follower : entry.following;
+                    if (!user) return null;
+
+                    const userDisplayName = user.name || user.username;
+                    const initials = (userDisplayName[0] || 'U').toUpperCase();
+
+                    return (
+                      <button
+                        key={entry.id}
+                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 hover:bg-neutral-50 flex items-center gap-3 text-left"
+                        onClick={() => {
+                          closeNetworkModal();
+                          navigate(`/profile/${user.username}`);
+                        }}
+                      >
+                        <div className="w-9 h-9 rounded-full bg-neutral-200 overflow-hidden flex-shrink-0 flex items-center justify-center text-xs font-bold text-neutral-700">
+                          {user.avatarUrl ? (
+                            <img
+                              src={user.avatarUrl}
+                              alt={userDisplayName}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            initials
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-neutral-900 truncate">{userDisplayName}</p>
+                          <p className="text-xs text-neutral-500 truncate">@{user.username}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

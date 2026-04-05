@@ -40,7 +40,9 @@ export class UsersService {
         take: 20,
         select: {
           id: true,
+          slug: true,
           title: true,
+          excerpt: true,
           content: true,
           createdAt: true,
           _count: {

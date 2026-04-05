@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Req, UseGuards } from '@nestjs/common';
 import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@authentication/guard/jwt.guard';
+import { OptionalJwtAuthGuard } from '@authentication/guard/optional-jwt.guard';
 
 @Controller('tags')
 export class TagsController {
@@ -20,6 +21,19 @@ export class TagsController {
   @ApiOperation({ summary: 'Get all tags' })
   findAllTags() {
     return this.tagsService.findAllTags();
+  }
+
+  @Get(':id/posts')
+  @ApiOperation({ summary: 'Get published posts by tag ID' })
+  @UseGuards(OptionalJwtAuthGuard)
+  findPostsByTagId(
+    @Param('id') id: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+    @Req() req?,
+  ) {
+    const userId = req?.user?.userId;
+    return this.tagsService.findPostsByTagId(id, Number(page), Number(limit), userId);
   }
 
   @Get(':id')

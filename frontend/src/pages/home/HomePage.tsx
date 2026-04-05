@@ -5,17 +5,19 @@ import { likesApi } from '@/services/likes.service';
 import { Post } from '@/types/post';
 import { Tag } from '@/types/tag';
 import { User } from '@/types/user';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AvatarMenu } from '@/components/AvatarMenu';
 import { useAppSelector } from '@/app/hooks';
 import { selectCurrentUser, selectIsAuthenticated } from '@/features/auth/auth.slice';
 import { useRequireAuthAction } from '@hooks/useRequireAuthAction';
+import { formatReadTime } from '@/utils/read-metrics';
+import { getPostPreviewText } from '@/utils/preview-text';
+import { copyPostShareLink } from '@/utils/share-link';
 import {
   BarChart3,
   Bell,
   Bookmark,
-  Compass,
   Flame,
   Heart,
   HelpCircle,
@@ -23,6 +25,7 @@ import {
   MessageCircle,
   Plus,
   Search,
+  Share2,
   Settings,
   Tag as TagIcon,
   TrendingUp,
@@ -34,24 +37,6 @@ function formatDateKey(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-function getCurrentStreak(posts: Post[]) {
-  const dateKeys = new Set(posts.map((post) => formatDateKey(new Date(post.createdAt))));
-  const today = new Date();
-  let streak = 0;
-
-  while (true) {
-    const cursor = new Date(today);
-    cursor.setDate(today.getDate() - streak);
-    const key = formatDateKey(cursor);
-    if (!dateKeys.has(key)) {
-      break;
-    }
-    streak += 1;
-  }
-
-  return streak;
 }
 
 function buildLast7DaysHeights(posts: Post[]) {
@@ -71,6 +56,15 @@ function buildLast7DaysHeights(posts: Post[]) {
   return values.map((value) => Math.max(8, Math.round((value / max) * 40)));
 }
 
+function shuffleItems<T>(items: T[]) {
+  const cloned = [...items];
+  for (let i = cloned.length - 1; i > 0; i -= 1) {
+    const randomIndex = Math.floor(Math.random() * (i + 1));
+    [cloned[i], cloned[randomIndex]] = [cloned[randomIndex], cloned[i]];
+  }
+  return cloned;
+}
+
 export function HomePage() {
   const currentUser = useAppSelector(selectCurrentUser);
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
@@ -88,6 +82,23 @@ export function HomePage() {
   const navigate = useNavigate();
   const { requireAuthAction } = useRequireAuthAction();
   const [pendingLikePostIds, setPendingLikePostIds] = useState<Set<string>>(new Set());
+  const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+
+  const handleSharePost = async (event: React.MouseEvent, slug: string, postId: string) => {
+    event.stopPropagation();
+
+    try {
+      await copyPostShareLink(slug);
+      setCopiedPostId(postId);
+
+      window.setTimeout(() => {
+        setCopiedPostId((current) => (current === postId ? null : current));
+      }, 1600);
+    } catch {
+      setError('Could not copy post link');
+    }
+  };
+
   const handleLikePost = async (event: React.MouseEvent, postId: string) => {
     event.stopPropagation();
 
@@ -153,8 +164,11 @@ export function HomePage() {
     loadingRef.current = true;
     try {
       const res = await postsApi.getAllPost(nextPage, 10);
-      console.log('Loaded posts:', res);
-      setPosts(prev => [...prev, ...res.items]);
+      setPosts(prev => {
+        const existingIds = new Set(prev.map((post) => post.id));
+        const uniqueIncoming = res.items.filter((post: Post) => !existingIds.has(post.id));
+        return [...prev, ...shuffleItems(uniqueIncoming)];
+      });
       setHasMore(res.hasMore);
       hasMoreRef.current = res.hasMore;
       pageRef.current = nextPage;
@@ -231,14 +245,24 @@ export function HomePage() {
     minute: '2-digit'
   }));
 
-  const postStreak = getCurrentStreak(posts);
-  const activeDays = new Set(posts.map((post) => formatDateKey(new Date(post.createdAt)))).size;
   const activityBarHeights = buildLast7DaysHeights(posts);
+  const hotTopics = useMemo(
+    () =>
+      [...posts]
+        .filter((post) => (post._count?.comments ?? 0) > 0)
+        .sort((a, b) => {
+          const commentDiff = (b._count?.comments ?? 0) - (a._count?.comments ?? 0);
+          if (commentDiff !== 0) return commentDiff;
+          return (b._count?.likes ?? 0) - (a._count?.likes ?? 0);
+        })
+        .slice(0, 5),
+    [posts],
+  );
 
   return (
     <div className="min-h-screen bg-[#f9f9f9] text-[#1a1c1c]">
       {/* Top Navigation Bar */}
-      <header className="fixed top-0 w-full flex justify-between items-center px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/50 z-50">
+      <header className="fixed top-0 w-full flex justify-between items-center px-4 md:px-6 h-16 bg-[#f9f9f9] border-b border-neutral-200/50 z-50">
         <div className="flex items-center gap-8">
           <span className="text-2xl font-bold font-['Space_Grotesk'] text-black">DevLog</span>
           <form
@@ -292,31 +316,36 @@ export function HomePage() {
         </div>
       </header>
 
-      <div className="flex pt-16 min-h-screen">
+      <div className="pt-16 min-h-screen xl:flex">
         {/* Left Sidebar */}
-        <aside className="fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#f3f3f3] flex flex-col p-4 space-y-2 z-40">
+        <aside className="hidden xl:flex fixed left-0 top-16 h-[calc(100vh-64px)] w-64 bg-[#f3f3f3] flex-col p-4 space-y-2 z-40">
           <div className="mb-8 px-4 py-2">
             <h2 className="font-['Space_Grotesk'] font-bold text-lg tracking-tight">Journal</h2>
             <p className="text-xs text-neutral-500 font-medium uppercase tracking-widest">Developer Logs</p>
           </div>
 
           <nav className="flex-1 space-y-1">
-            <a className="bg-[#e2e2e2] text-black rounded-lg px-4 py-2 flex items-center gap-3 transition-transform translate-x-1 interactive-card" href="#">
+            <button
+              className="w-full bg-[#e2e2e2] text-black rounded-lg px-4 py-2 flex items-center gap-3 transition-transform translate-x-1 interactive-card"
+              onClick={() => navigate('/home')}
+            >
               <Home className="h-4 w-4 text-sky-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Home</span>
-            </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
-              <Compass className="h-4 w-4 text-emerald-600" />
-              <span className="font-['Inter'] text-sm font-medium tracking-wide">Explore</span>
-            </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+            </button>
+            <button
+              className="w-full text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card"
+              onClick={() => navigate('/tags')}
+            >
               <TagIcon className="h-4 w-4 text-orange-600" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Tags</span>
-            </a>
-            <a className="text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card" href="#">
+            </button>
+            <button
+              className="w-full text-neutral-600 px-4 py-2 flex items-center gap-3 hover:bg-neutral-200 transition-all rounded-lg interactive-card"
+              onClick={() => requireAuthAction(() => navigate('/bookmarks'))}
+            >
               <Bookmark className="h-4 w-4 text-blue-700" />
               <span className="font-['Inter'] text-sm font-medium tracking-wide">Bookmarks</span>
-            </a>
+            </button>
           </nav>
 
           <button
@@ -343,7 +372,7 @@ export function HomePage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 ml-64 mr-72 p-8 max-w-4xl mx-auto">
+        <main className="flex-1 p-4 md:p-6 xl:p-8 max-w-4xl mx-auto xl:ml-64 xl:mr-[18.5rem]">
           <header className="mb-12">
             <h1 className="text-4xl font-bold tracking-tight mb-2">Morning Session</h1>
             <p className="text-neutral-500 font-medium">{currentDate}</p>
@@ -373,8 +402,10 @@ export function HomePage() {
 
             {posts.map((post) => {
               const tagName = post.tags?.[0]?.tag?.name ?? 'GENERAL';
-              const words = (post.content || '').trim().split(/\s+/).filter(Boolean).length;
-              const readTime = `${Math.max(1, Math.ceil(words / 200))}m read`;
+              const readTime = formatReadTime(post.readTimeMinutes, post.content);
+              const previewText = getPostPreviewText(post.excerpt, post.content, {
+                fallback: 'No excerpt',
+              });
 
               return (
                 <article key={post.id} className="group">
@@ -402,7 +433,7 @@ export function HomePage() {
 
                     {/* Title + tag */}
                     <div className="flex justify-between items-start mb-4">
-                      <h2 className="text-2xl font-bold hover:underline underline-offset-4 decoration-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => navigate(`/posts/${post.id}`)}>
+                      <h2 className="text-2xl font-bold hover:underline underline-offset-4 decoration-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => navigate(`/posts/${post.slug}`)}>
                         {post.title}
                       </h2>
                       <span className="text-xs font-mono bg-neutral-200 px-2 py-1 rounded text-neutral-700">
@@ -411,7 +442,7 @@ export function HomePage() {
                     </div>
 
                     <p className="text-neutral-600 leading-relaxed mb-6 line-clamp-3">
-                      {post.excerpt || post.content}
+                      {previewText}
                     </p>
 
                     {/* Stats */}
@@ -426,10 +457,17 @@ export function HomePage() {
                         <Heart className={`h-[18px] w-[18px] like-icon ${post.isLikedByMe ? 'fill-current' : ''}`} />
                         {post._count?.likes ?? 0}
                       </div>
-                      <div className="flex items-center gap-1.5 hover:text-blue-700 transition-colors cursor-pointer tap-feedback" onClick={() => navigate(`/posts/${post.id}`)}>
+                      <div className="flex items-center gap-1.5 hover:text-blue-700 transition-colors cursor-pointer tap-feedback" onClick={() => navigate(`/posts/${post.slug}`)}>
                         <MessageCircle className="h-[18px] w-[18px]" />
                         {post._count?.comments ?? 0}
                       </div>
+                      <button
+                        className="flex items-center gap-1.5 hover:text-emerald-700 transition-colors tap-feedback"
+                        onClick={(event) => handleSharePost(event, post.slug, post.id)}
+                      >
+                        <Share2 className="h-[18px] w-[18px]" />
+                        <span>{copiedPostId === post.id ? 'Copied' : 'Share'}</span>
+                      </button>
                       <span className="ml-auto">{readTime}</span>
                     </div>
 
@@ -495,7 +533,7 @@ export function HomePage() {
             )}
 
             {/* Snippet Card */}
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="bg-neutral-100 p-6 rounded-lg border border-neutral-200/50">
                 <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Snippet of the day</h3>
                 <code className="block text-xs font-mono text-black bg-white/50 p-4 rounded mb-4">
@@ -514,23 +552,46 @@ export function HomePage() {
         </main>
 
         {/* Right Sidebar */}
-        <aside className="fixed right-0 top-16 h-[calc(100vh-64px)] w-72 bg-[#f9f9f9] flex flex-col p-6 border-l border-neutral-100 z-40 overflow-y-auto">
-          {/* Streak Tracker */}
+        <aside className="w-full bg-[#f9f9f9] p-4 md:p-6 border-t border-neutral-200 xl:fixed xl:right-0 xl:top-16 xl:h-[calc(100vh-64px)] xl:w-[18.5rem] xl:bg-[#f9f9f9] xl:flex xl:flex-col xl:p-6 xl:border-l xl:border-t-0 xl:border-neutral-100 xl:z-40 xl:overflow-y-auto">
+          {/* Hot Topic */}
           <div className="bg-white p-6 rounded-xl mb-8 shadow-sm border border-neutral-100">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Daily Streak</span>
+            <div className="flex items-center gap-2 mb-4">
               <Flame className="h-4 w-4 text-orange-500" />
+              <h3 className="font-['Space_Grotesk'] text-xs uppercase tracking-widest font-bold">Hot Topic</h3>
             </div>
-            <div className="text-3xl font-bold font-['Space_Grotesk'] mb-2">{postStreak} Days</div>
-            <div className="flex gap-1.5">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className={`h-1.5 flex-1 rounded-full ${i < Math.min(postStreak, 5) ? 'bg-black' : 'bg-neutral-200'}`}></div>
+
+            <div className="space-y-3">
+              {loading && posts.length === 0 && Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="space-y-2 animate-pulse">
+                  <div className="h-3 w-12 bg-neutral-200 rounded" />
+                  <div className="h-4 w-full bg-neutral-200 rounded" />
+                  <div className="h-3 w-24 bg-neutral-200 rounded" />
+                </div>
               ))}
-              {[...Array(2)].map((_, i) => (
-                <div key={i + 5} className={`h-1.5 flex-1 rounded-full ${i + 5 < Math.min(postStreak, 7) ? 'bg-black' : 'bg-neutral-200'}`}></div>
+
+              {!loading && hotTopics.map((topic, index) => (
+                <button
+                  key={topic.id}
+                  className="w-full text-left p-2 rounded-lg hover:bg-neutral-100 transition-colors"
+                  onClick={() => navigate(`/posts/${topic.slug}`)}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">#{index + 1}</p>
+                      <p className="text-sm font-semibold line-clamp-2 leading-snug">{topic.title}</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-blue-700 whitespace-nowrap">
+                      {topic._count?.comments ?? 0} discussions
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-neutral-500 mt-1">@{topic.author?.username ?? 'unknown'}</p>
+                </button>
               ))}
+
+              {!loading && hotTopics.length === 0 && (
+                <p className="text-[11px] text-neutral-500">No active discussions yet.</p>
+              )}
             </div>
-            <p className="text-[11px] text-neutral-400 mt-3">{activeDays} active posting days in your current feed window.</p>
           </div>
 
           {/* Trending Tags */}
@@ -544,12 +605,13 @@ export function HomePage() {
                 <div key={idx} className="h-7 w-20 rounded-full bg-neutral-200 animate-pulse" />
               ))}
               {!sidebarLoading && tags.map((tag) => (
-                <span
+                <button
                   key={tag.id}
-                  className="text-[11px] font-mono bg-neutral-200 px-3 py-1.5 rounded-full"
+                  className="text-[11px] font-mono bg-neutral-200 px-3 py-1.5 rounded-full hover:bg-neutral-300 transition-colors"
+                  onClick={() => navigate(`/tags?tagId=${tag.id}`)}
                 >
                   #{tag.name}
-                </span>
+                </button>
               ))}
               {!sidebarLoading && tags.length === 0 && (
                 <span className="text-[11px] text-neutral-500">No tags yet</span>
