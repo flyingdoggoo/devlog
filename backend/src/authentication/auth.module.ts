@@ -18,7 +18,7 @@ import { GoogleStrategy } from "./strategy/google.strategy";
                     // ConfigService returns strings; number is interpreted as seconds.
                     // If we pass string "900", jsonwebtoken treats it as 900ms.
                     // This fixes immediately-expired access tokens.
-                    expiresIn: Number(configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900,
+                    expiresIn: configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME'),
                 },
             }),
             inject: [ConfigService],
