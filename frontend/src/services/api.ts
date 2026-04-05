@@ -42,8 +42,10 @@ apiClient.interceptors.response.use(
     (response) => response,
     async (error: AxiosError<{ message: string }>) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const requestUrl = originalRequest?.url ?? '';
+    const isAuthRefreshRequest = /\/auth\/refresh(?:$|\?)/i.test(requestUrl);
 
-        if (error.response?.status !== 401 || originalRequest._retry) {
+    if (error.response?.status !== 401 || originalRequest._retry || isAuthRefreshRequest) {
             return Promise.reject(error);
         }
 
@@ -59,7 +61,16 @@ apiClient.interceptors.response.use(
         isRefreshing = true;
 
         try {
-            await apiClient.post('/auth/refresh'); // cookie RefreshToken + SessionId tự đính kèm
+          const baseURL = (apiClient.defaults.baseURL ?? '').replace(/\/+$/, '');
+          const refreshUrl = baseURL ? `${baseURL}/auth/refresh` : '/api/auth/refresh';
+
+          // Use a raw axios call here to avoid interceptor recursion on 401.
+          await axios.post(refreshUrl, undefined, {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
             processQueue(null);
             return apiClient(originalRequest); // retry request gốc
         } catch (refreshError) {
