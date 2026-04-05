@@ -176,7 +176,10 @@ export function HomePage() {
     const fetchSidebarData = async () => {
       setSidebarLoading(true);
       try {
-        const [allTags, allUsers] = await Promise.all([tagsApi.getAllTags(), usersApi.getAllUsers()]);
+        const allTagsPromise = tagsApi.getAllTags();
+        const allUsersPromise = isAuthenticated ? usersApi.getAllUsers() : Promise.resolve([] as User[]);
+        const [allTags, allUsers] = await Promise.all([allTagsPromise, allUsersPromise]);
+
         setTags(allTags.slice(0, 8));
         setSuggestedUsers(
           allUsers
@@ -192,7 +195,7 @@ export function HomePage() {
     };
 
     fetchSidebarData();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, isAuthenticated]);
 
   useEffect(() => {
     const onScroll = () => {

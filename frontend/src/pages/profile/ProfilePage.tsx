@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAppSelector } from '@app/hooks';
-import { selectCurrentUser } from '@features/auth/auth.slice';
+import { selectCurrentUser, selectIsAuthenticated } from '@features/auth/auth.slice';
 import { AvatarMenu } from '@components/AvatarMenu';
 import { usersApi, type UserProfile } from '@services/users.service';
 import axios from 'axios';
@@ -81,6 +81,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { username } = useParams<{ username: string }>();
   const currentUser = useAppSelector(selectCurrentUser);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -197,11 +198,29 @@ export function ProfilePage() {
               type="text"
             />
           </div>
-          <button className="p-2.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all tap-feedback">
-            <Bell className="h-4 w-4" />
-          </button>
-
-          <AvatarMenu size="sm" />
+          {isAuthenticated ? (
+            <>
+              <button className="p-2.5 rounded-full bg-amber-50 text-amber-600 hover:bg-amber-100 transition-all tap-feedback">
+                <Bell className="h-4 w-4" />
+              </button>
+              <AvatarMenu size="sm" />
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-neutral-300 text-neutral-700 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all tap-feedback"
+              >
+                Login
+              </button>
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-all tap-feedback"
+              >
+                Register
+              </button>
+            </>
+          )}
         </div>
       </nav>
 

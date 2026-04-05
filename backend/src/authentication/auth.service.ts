@@ -17,8 +17,28 @@ export class AuthService {
         private configService: ConfigService,
         private prisma: PrismaService,
     ) { }
+
+    private resolveCookiePolicy() {
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? '';
+        const isHttpsFrontend = frontendUrl.trim().toLowerCase().startsWith('https://');
+        const isProduction = (this.configService.get<string>('NODE_ENV') ?? '').toLowerCase() === 'production';
+
+        // In production and/or HTTPS frontend, enforce cross-site safe cookie settings.
+        if (isProduction || isHttpsFrontend) {
+            return {
+                sameSite: 'None' as const,
+                secureFlag: '; Secure',
+            };
+        }
+
+        return {
+            sameSite: 'Lax' as const,
+            secureFlag: '',
+        };
+    }
     async validateUserLocal(email: string, password: string) {
-        const credential = await this.userService.findByEmail(email);
+        const normalizedEmail = email.trim().toLowerCase();
+        const credential = await this.userService.findByEmail(normalizedEmail);
         if (!credential) {
             throw new HttpException('Invalid Email', HttpStatus.BAD_REQUEST);
         }
@@ -51,9 +71,7 @@ export class AuthService {
         const accessTokenTTL = Number(this.configService.get('JWT_ACCESS_TOKEN_EXPIRATION_TIME')) || 900;
         const refreshTokenTTL = Number(this.configService.get('JWT_REFRESH_TOKEN_EXPIRATION_TIME')) || 604800;
         const accessToken = this.jwtService.sign({ userId } as Payload);
-        const isProduction = this.configService.get('NODE_ENV') === 'production';
-        const sameSite = isProduction ? 'None' : 'Lax';
-        const secureFlag = isProduction ? '; Secure' : '';
+        const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const refreshToken = randomBytes(64).toString('hex');
         const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
@@ -75,8 +93,8 @@ export class AuthService {
         });
         const effectiveSessionId = session.id;
         const authCookie = `Authentication=${accessToken}; HttpOnly; Path=/; Max-Age=${accessTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
-        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=${refreshToken}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=${effectiveSessionId}; HttpOnly; Path=/api/auth; Max-Age=${refreshTokenTTL}; SameSite=${sameSite}${secureFlag}`;
         return [authCookie, refreshCookie, sessionCookie];
     }
 
@@ -199,19 +217,19 @@ export class AuthService {
             });
         }
 
-        const isProduction = this.configService.get('NODE_ENV') === 'production';
-        const sameSite = isProduction ? 'None' : 'Lax';
-        const secureFlag = isProduction ? '; Secure' : '';
+        const { sameSite, secureFlag } = this.resolveCookiePolicy();
 
         const authCookie = `Authentication=; HttpOnly; Path=/; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
-        const refreshCookie = `RefreshToken=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
-        const sessionCookie = `SessionId=; HttpOnly; Path=/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const refreshCookie = `RefreshToken=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
+        const sessionCookie = `SessionId=; HttpOnly; Path=/api/auth; Max-Age=0; SameSite=${sameSite}${secureFlag}`;
 
         return [authCookie, refreshCookie, sessionCookie];
     }
 
     async register(registerDto: RegisterDto) {
-        const { email, password, confirmPassword, username } = registerDto;
+        const email = registerDto.email.trim().toLowerCase();
+        const username = registerDto.username.trim().toLowerCase();
+        const { password, confirmPassword } = registerDto;
         if (password !== confirmPassword) {
             throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
         }
@@ -219,6 +237,10 @@ export class AuthService {
         if (existingUser) {
             throw new HttpException('User already exists', HttpStatus.BAD_REQUEST);
         }
-        return this.userService.createUser(registerDto);
+        return this.userService.createUser({
+            ...registerDto,
+            email,
+            username,
+        });
     }
 }
